@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warenkorb</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <!-- Logo -->
+        <div class="site-branding">
+            <a href="index.html" class="site-logo-link" aria-label="Zur Startseite (Icon)">
+                <img src="img/logo.png" alt="Lecker Icon" class="site-logo-icon">
+            </a>
+            <a href="index.html" class="site-logo-link" aria-label="Zur Startseite (Schriftzug)">
+                <img src="img/schriftzug.png" alt="Lecker BYTE&BITE Schriftzug" class="site-logo-wordmark">
+            </a>
+        </div>
+      <!-- Navigationsleiste -->
+      <nav class="site-nav" aria-label="Hauptnavigation">
+        <ul>
+            <li><a href="index.html" class="">Startseite</a></li>
+            <li><a href="configurator.html" class="">Pizza zusammenstellen</a></li>
+            <li><a href="about.html" class="">Über uns</a></li>
+            <li><a href="contact.html" class="">Kontakt</a></li>
+            <li><a href="cart.html" class="active">Warenkorb</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Hauptinhalt: Warenkorb und Zusammenfassung -->
+  <main class="site-main container">
+
+    <section class="grid-2 cart-layout">
+      <!-- Linke Spalte: Artikel im Warenkorb -->
+      <div class="panel">
+        <h2>Ihre Artikel</h2>
+        <div id="cart-empty">Ihr Warenkorb ist noch leer.</div>
+        <!-- Tabelle bei leeren Warenkorb verstecken -->
+        <table id="cart-table" class="cart-table" style="display:none;">
+          <thead>
+            <tr>
+              <th>Konfiguration</th>
+              <th>Menge</th>
+              <th>Preis</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="cart-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Rechte Spalte: Rechnung -->
+      <aside class="panel">
+        <h2>Zusammenfassung</h2>
+
+        <div class="summary-line">
+          <span>Nettobetrag</span> <strong id="cart-net">0,00 €</strong>
+        </div>
+        <div class="summary-line">
+          <span>Lieferung</span> <strong id="cart-shipping">0,00 €</strong>
+        </div>
+        <div class="summary-line">
+          <span>Zwischensumme</span> <strong id="cart-subtotal">0,00 €</strong>
+        </div>
+        <div class="summary-line">
+          <span>MwSt. (19%)</span> <strong id="cart-vat">0,00 €</strong>
+        </div>
+        <div class="summary-total">
+          <span>Bruttobetrag</span> <strong id="cart-total">0,00 €</strong>
+        </div>
+
+        <a href="checkout.html" class="btn-primary fullwidth">Zur Kasse</a>
+      </aside>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="year"></span> Byte&Bite GmbH. Alle Rechte vorbehalten. • <a href="legal.html">Impressum/Datenschutz</a></p>
+    </div>
+  </footer>
+</body>
+</html>

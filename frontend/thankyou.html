@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bestellung bestätigt</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+        <!-- Logo -->
+        <div class="site-branding">
+            <a href="index.html" class="site-logo-link" aria-label="Zur Startseite (Icon)">
+                <img src="img/logo.png" alt="Lecker Icon" class="site-logo-icon">
+            </a>
+            <a href="index.html" class="site-logo-link" aria-label="Zur Startseite (Schriftzug)">
+                <img src="img/schriftzug.png" alt="Lecker BYTE&BITE Schriftzug" class="site-logo-wordmark">
+            </a>
+        </div>
+        <!-- Navigationsleiste -->
+        <nav class="site-nav" aria-label="Hauptnavigation">
+          <ul>
+              <li><a href="index.html" class="">Startseite</a></li>
+              <li><a href="configurator.html" class="">Pizza zusammenstellen</a></li>
+              <li><a href="about.html" class="">Über uns</a></li>
+              <li><a href="contact.html" class="">Kontakt</a></li>
+              <li><a href="cart.html" class="">Warenkorb</a></li>
+          </ul>
+        </nav>
+    </div>
+  </header>
+
+  <!-- Hauptinhalt: Danksagung + Bestellübersicht -->
+  <main class="site-main container">
+    <section class="card">
+      <h2>Vielen Dank für Ihre Bestellung!</h2>
+      <p>Wir haben Ihre Bestellung erhalten und beginnen direkt mit der Zubereitung 🍕</p>
+      <p>Unten finden Sie die Zusammenfassung Ihrer Bestellung.</p>
+    </section>
+
+    <section class="panel" id="ty-summary">
+      <h3>Bestellübersicht</h3>
+
+      <div class="summary-line">
+        <span>Nettobetrag</span> <strong id="ty-net">–</strong>
+      </div>
+      <div class="summary-line">
+        <span>Lieferung</span> <strong id="ty-shipping">–</strong>
+      </div>
+      <div class="summary-line">
+        <span>MwSt. (19%)</span> <strong id="ty-vat">–</strong>
+      </div>
+      <div class="summary-total">
+        <span>Bruttobetrag</span> <strong id="ty-total">–</strong>
+      </div>
+
+      <div class="summary-line" style="margin-top:1rem;">
+        <span>Geplanter Liefertermin</span> <strong id="ty-time">–</strong>
+      </div>
+
+      <div class="summary-line" style="margin-top:1.5rem;">
+        <a href="index.html" class="btn-secondary">Zur Startseite</a>
+        <a href="configurator.html" class="btn-primary">Noch eine Pizza bauen</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="container">
+      <p>&copy; <span id="year"></span> Byte&Bite GmbH. Alle Rechte vorbehalten. • <a href="legal.html">Impressum/Datenschutz</a></p>
+    </div>
+  </footer>
+</body>
+</html>
