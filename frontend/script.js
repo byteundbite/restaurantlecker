@@ -494,16 +494,18 @@ renderMiniCart();
     // Summen bilden wie im Warenkorb (aber ohne Mengenänderung)
     let sumNet = 0;
     items.forEach(it => {
-      const itTotalGross = Number(it.total) || 0;
-      const itTotalNet = (it.totalNet !== undefined)
-        ? Number(it.totalNet)
-        : removeVAT(itTotalGross);
-      sumNet += itTotalNet;
+  const itTotalGross = Number(it.total) || 0;
+  const itTotalNet = (it.totalNet !== undefined)
+    ? Number(it.totalNet)
+    : removeVAT(itTotalGross);
+  sumNet += itTotalNet;
 
-      const li = document.createElement("li");
-      li.innerHTML = `<span class="small">${pizzaLabel(it)}</span><strong>${euro(it.total)}</strong>`;
-      coList.appendChild(li);
-    });
+  const li = document.createElement("li");
+  // Menge anzeigen
+  li.innerHTML = `<span class="small">${it.qty} × ${pizzaLabel(it)}</span> <strong>${euro(it.total)}</strong>`;
+  coList.appendChild(li);
+});
+
 
     const shippingNet = CONFIG.prices.shippingFlat || 0;
     const vatAmount = (sumNet + shippingNet) * (CONFIG.vatRate || 0);
