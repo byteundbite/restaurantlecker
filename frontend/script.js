@@ -442,8 +442,10 @@ document.addEventListener("DOMContentLoaded", () => {
       coDateTimeEl.classList.add("faded");
       // Wenn Checkbox aktiv ist -> gewählten Zeitpunkt löschen
       coDateTimeEl.value = "";
+      coDateTimeEl.required = false;
     } else {
       coDateTimeEl.classList.remove("faded");
+      coDateTimeEl.required = true;
     }
   }
 
