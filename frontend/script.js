@@ -608,9 +608,6 @@ renderMiniCart();
   }
 });
 
-
-
-
 /* ----- Saisonale Bestseller-Pizza ----- */
 const seasonalEl = document.getElementById("seasonal-special");
 if (seasonalEl){
