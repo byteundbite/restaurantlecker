@@ -217,60 +217,85 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Artikel in den Warenkorb legen (stilles Hinzufügen; kein Popup)
     addBtn.addEventListener("click", () => {
-      const item = {
-        size: sizeEl.value,
-        // Für das Label speichern wir die sichtbaren Texte von Teig/Soße ab
-        dough: doughEl.options[doughEl.selectedIndex].text,
-        sauce: sauceEl.options[sauceEl.selectedIndex].text,
-        cheeses: checkedValues("input.cheese").map(v => ({mozzarella:"Mozzarella", cheddar:"Cheddar", goat:"Ziegenkäse"}[v] || v)),
-        toppings: checkedValues("input.topping").map(v => ({
-          salami:"Salami", ham:"Hinterschinken", parma:"Parmaschinken", chicken:"Hähnchen",
-          porcini:"Steinpilze", paprika:"Paprika", onion:"Zwiebeln", olives:"Oliven",
-          rucola:"Rucola", peperoni:"Peperoni", corn:"Mais", mushrooms:"Champignons"
-        }[v] || v)),
-        note: (noteEl?.value || "").trim(),
-        qty: Math.max(1, parseInt(qtyEl.value || "1", 10))
-      };
+  const item = {
+    size: sizeEl.value,
+    dough: doughEl.options[doughEl.selectedIndex].text,
+    sauce: sauceEl.options[sauceEl.selectedIndex].text,
+    cheeses: checkedValues("input.cheese").map(v => ({mozzarella:"Mozzarella", cheddar:"Cheddar", goat:"Ziegenkäse"}[v] || v)),
+    toppings: checkedValues("input.topping").map(v => ({
+      salami:"Salami", ham:"Hinterschinken", parma:"Parmaschinken", chicken:"Hähnchen",
+      porcini:"Steinpilze", paprika:"Paprika", onion:"Zwiebeln", olives:"Oliven",
+      rucola:"Rucola", peperoni:"Peperoni", corn:"Mais", mushrooms:"Champignons"
+    }[v] || v)),
+    note: (noteEl?.value || "").trim(),
+    qty: Math.max(1, parseInt(qtyEl.value || "1", 10))
+  };
 
-      // Preise sichern:
-      const unitNet = calcUnit();            // Nettopreis pro Stück
-      const unitGross = applyVAT(unitNet);   // Brutto pro Stück
-      item.unitNet = unitNet;
-      item.unit = unitGross;                 // historisch: 'unit' = Brutto-Einzelpreis
-      item.totalNet = unitNet * item.qty;    // Netto Gesamtposition
-      item.total = unitGross * item.qty;     // Brutto Gesamtposition (historisch: 'total')
+  const unitNet = calcUnit();
+  const unitGross = applyVAT(unitNet);
 
-      const cart = loadCart();
-      cart.push(item);
-      saveCart(cart);
+  item.unitNet = unitNet;
+  item.unit = unitGross;
+  item.totalNet = unitNet * item.qty;
+  item.total = unitGross * item.qty;
 
-      renderMiniCart();
-      calcAndRenderPrice();
-    });
+  const cart = loadCart();
 
-    // Mini-Warenkorb (Konfigurator-Seite)
-    function renderMiniCart(){
-      if (!miniList || !miniEmpty || !miniSummary || !miniTotal) return;
-      const cart = loadCart();
-      miniList.innerHTML = "";
-      if (cart.length === 0){
-        miniEmpty.style.display = "block";
-        miniSummary.style.display = "none";
-        return;
-      }
-      miniEmpty.style.display = "none";
-      miniSummary.style.display = "flex";
-      let sum = 0;
-      cart.forEach(it => {
-        sum += it.total;
-        const li = document.createElement("li");
-        li.innerHTML = `<span class="small">${pizzaLabel(it)}</span><strong>${euro(it.total)}</strong>`;
-        miniList.appendChild(li);
-      });
-      miniTotal.textContent = euro(sum);
-    }
-    renderMiniCart();
+  // Prüfen, ob die gleiche Pizza schon existiert
+  const existing = cart.find(it =>
+    it.size === item.size &&
+    it.dough === item.dough &&
+    it.sauce === item.sauce &&
+    JSON.stringify(it.cheeses) === JSON.stringify(item.cheeses) &&
+    JSON.stringify(it.toppings) === JSON.stringify(item.toppings) &&
+    it.note === item.note
+  );
+
+  if (existing) {
+    // Gleiche Pizza gefunden -> Menge erhöhen
+    existing.qty += item.qty;
+    existing.totalNet = existing.unitNet * existing.qty;
+    existing.total    = existing.unit * existing.qty;
+  } else {
+    cart.push(item);
   }
+
+  saveCart(cart);
+  renderMiniCart();
+  calcAndRenderPrice();
+});
+
+// Mini-Warenkorb rendern
+function renderMiniCart() {
+  if (!miniList || !miniEmpty || !miniSummary || !miniTotal) return;
+
+  const cart = loadCart();
+  miniList.innerHTML = "";
+
+  if (cart.length === 0) {
+    miniEmpty.style.display = "block";
+    miniSummary.style.display = "none";
+    miniTotal.textContent = euro(0);
+    return;
+  }
+
+  miniEmpty.style.display = "none";
+  miniSummary.style.display = "flex";
+
+  let sum = 0;
+
+  cart.forEach(it => {
+    sum += it.unit * it.qty;
+
+    const li = document.createElement("li");
+    li.innerHTML = `<span class="small">${it.qty} × ${pizzaLabel(it)}</span> <strong>${euro(it.unit * it.qty)}</strong>`;
+    miniList.appendChild(li);
+  });
+
+  miniTotal.textContent = euro(sum);
+}
+renderMiniCart();
+}
 
   /* ----- 3.4 Warenkorb-Seite: Tabelle rendern, Mengen ändern, entfernen, Summen ----- */
   const cartTable = document.getElementById("cart-table");
@@ -442,8 +467,10 @@ document.addEventListener("DOMContentLoaded", () => {
       coDateTimeEl.classList.add("faded");
       // Wenn Checkbox aktiv ist -> gewählten Zeitpunkt löschen
       coDateTimeEl.value = "";
+      coDateTimeEl.required = false;
     } else {
       coDateTimeEl.classList.remove("faded");
+      coDateTimeEl.required = true;
     }
   }
 
@@ -469,16 +496,18 @@ document.addEventListener("DOMContentLoaded", () => {
     // Summen bilden wie im Warenkorb (aber ohne Mengenänderung)
     let sumNet = 0;
     items.forEach(it => {
-      const itTotalGross = Number(it.total) || 0;
-      const itTotalNet = (it.totalNet !== undefined)
-        ? Number(it.totalNet)
-        : removeVAT(itTotalGross);
-      sumNet += itTotalNet;
+  const itTotalGross = Number(it.total) || 0;
+  const itTotalNet = (it.totalNet !== undefined)
+    ? Number(it.totalNet)
+    : removeVAT(itTotalGross);
+  sumNet += itTotalNet;
 
-      const li = document.createElement("li");
-      li.innerHTML = `<span class="small">${pizzaLabel(it)}</span><strong>${euro(it.total)}</strong>`;
-      coList.appendChild(li);
-    });
+  const li = document.createElement("li");
+  // Menge anzeigen
+  li.innerHTML = `<span class="small">${it.qty} × ${pizzaLabel(it)}</span> <strong>${euro(it.total)}</strong>`;
+  coList.appendChild(li);
+});
+
 
     const shippingNet = CONFIG.prices.shippingFlat || 0;
     const vatAmount = (sumNet + shippingNet) * (CONFIG.vatRate || 0);
@@ -613,3 +642,62 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 });
+
+/* ----- Saisonale Bestseller-Pizza ----- */
+const seasonalEl = document.getElementById("seasonal-special");
+if (seasonalEl){
+  // Aktueller Monat bestimmen
+  const month = new Date().getMonth(); // 0=Jan ... 11=Dez
+  let season;
+  if (month >= 2 && month <= 4) season = "spring";   // März–Mai
+  else if (month >= 5 && month <= 7) season = "summer"; // Juni–Aug
+  else if (month >= 8 && month <= 10) season = "autumn"; // Sept–Nov
+  else season = "winter"; // Dez–Feb
+
+  // Presets für jede Jahreszeit
+  // Saisonale Bestseller-Pizza Presets
+const seasonalSpecials = {
+  spring: { size: "30", dough: "italian", sauce: "tomato", cheeses: ["mozzarella"], toppings: ["basil","artichokes","mushrooms"], note: "Frühlings-Pizza: Frischer Gartenmix", qty: 1 },
+  summer: { size: "30", dough: "italian", sauce: "tomato", cheeses: ["mozzarella","goat"], toppings: ["tomatoes","zucchini","bellpeppers"], note: "Sommer-Pizza: Mediterraner Genuss", qty: 1 },
+  autumn: { size: "30", dough: "american", sauce: "bbq", cheeses: ["cheddar"], toppings: ["chicken","onion","mushrooms","peperoni"], note: "Herbst-Pizza: Herzhaft & würzig", qty: 1 },
+  winter: { size: "30", dough: "italian", sauce: "oilherbs", cheeses: ["mozzarella","goat"], toppings: ["rucola","porcini","walnuts"], note: "Winter-Pizza: Trüffel & Wintergemüse", qty: 1 }
+};
+
+  const preset = seasonalSpecials[season];
+  if (preset){
+    // Preis dynamisch berechnen
+    function calcPizzaPrice(item){
+      let unit = 0;
+      unit += CONFIG.prices.size[item.size] || 0;
+      unit += CONFIG.prices.dough[item.dough] || 0;
+      unit += CONFIG.prices.sauce[item.sauce] || 0;
+      (item.cheeses || []).forEach(c => unit += CONFIG.prices.cheese[c] || 0);
+      (item.toppings || []).forEach(t => unit += CONFIG.prices.toppings[t] || 0);
+      return applyVAT(unit); // Brutto inkl. MwSt.
+    }
+
+    const priceStr = euro(calcPizzaPrice(preset));
+
+    // Text inkl. Preis
+    seasonalEl.textContent = `${preset.note} (${priceStr})`;
+
+    // Button wie bei Pizza des Tages
+    const link = document.createElement('a');
+    link.href = 'configurator.html';
+    link.textContent = 'Jetzt auswählen';
+    link.className = 'btn-primary';
+    link.style.marginLeft = '0.6rem';
+
+    const wrap = document.createElement('span');
+    wrap.className = 'daily-wrap';
+    wrap.appendChild(document.createTextNode(' '));
+    wrap.appendChild(link);
+    seasonalEl.appendChild(wrap);
+
+    link.addEventListener('click', (e) => {
+      e.preventDefault();
+      localStorage.setItem(CONFIG.storageKey + "_pending", JSON.stringify(preset));
+      window.location.href = link.href;
+    });
+  }
+}
