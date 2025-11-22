@@ -579,7 +579,40 @@ renderMiniCart();
       if (tyShipping)tyShipping.textContent = euro(summary.shipping || 0);
       if (tyVat)     tyVat.textContent = euro(summary.vat || 0);
       if (tyTotal)   tyTotal.textContent = euro(summary.gross || 0);
-      if (tyTime)    tyTime.textContent = summary.delivery || "–";
+      
+  	  //Formatierung des Lieferdatums bei "thankyou"
+      if (tyTime) {
+      // Prüfen, ob der Text "nächstmöglicher Zeitpunkt" oder "nicht angegeben" ist.
+      // Diese Texte sollen 1:1 so angezeigt werden, weil sie keine Zeitangabe sind.
+      if (
+        summary.delivery === "nächstmöglicher Zeitpunkt" ||
+        summary.delivery === "nicht angegeben"
+      ) {
+        tyTime.textContent = summary.delivery; // Einfach direkt ausgeben
+      } 
+      // Wenn ein Datum angegeben wurde (z. B. 2025-11-12T17:11)
+      else if (summary.delivery) {
+        const date = new Date(summary.delivery); // ISO-String in echtes Datum umwandeln
+
+        // Datum und Uhrzeit schön auf Deutsch formatieren, z. B.:
+        // "Mittwoch, 12.11.2025, 17:11 Uhr"
+        tyTime.textContent =
+          date.toLocaleString("de-DE", {
+            weekday: "long",  // Wochentag ausschreiben
+            day: "2-digit",   // Tag zweistellig
+            month: "2-digit", // Monat zweistellig
+            year: "numeric",  // Jahr vierstellig
+            hour: "2-digit",  // Stunde zweistellig
+            minute: "2-digit" // Minute zweistellig
+          }) + " Uhr";
+      } 
+      // Wenn gar keine Information vorhanden ist
+      else {
+        tyTime.textContent = "–"; // Platzhalter
+      
+        }
+      }
+      
     } else {
       // Fallback falls direkt aufgerufen ohne Bestellung
       if (tyNet)     tyNet.textContent = "0,00 €";
