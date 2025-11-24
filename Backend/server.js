@@ -64,6 +64,10 @@ try {
     app.use(morgan('dev'));
 
     // binding endpoints
+
+    app.use("/api", require("./services/pizzaconfig.js")); // Pizza Konfig hinzugefügt
+
+
     const TOPLEVELPATH = '/api';
     console.log('Binding enpoints, top level Path at ' + TOPLEVELPATH);
     
@@ -203,3 +207,4 @@ try {
 } catch (ex) {
     console.error(ex);
 }
+
