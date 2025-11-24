@@ -54,7 +54,7 @@ serviceRouter.get("/pizza/config", function (request, response) {
             }
         });
 
-        console.log("Service PizzaConfig: OK – sending data");
+        console.log("Service PizzaConfig: OK - sending data");
         response.status(200).json(data);
     } catch (ex) {
         console.error("Service PizzaConfig: Error", ex.message);
