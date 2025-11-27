@@ -1,68 +1,74 @@
+// services/pizzaconfig.js
 const express = require("express");
-var serviceRouter = express.Router();
+const router = express.Router();
+const helper = require("../helper.js");
 
 const ProduktDao = require("../dao/produktDao.js");
+const ProduktkategorieDao = require("../dao/produktkategorieDao.js");
 
-console.log("- Service PizzaConfig");
+// Mapping für DB-Kategorie-Bezeichnungen -> Frontend-Schlüssel für scrript.js
+const CATEGORY_MAP = {
+    "Pizza Größe": "groesse",
+    "Pizza Teig": "teig",
+    "Pizza Soße": "sosse",
+    "Pizza Käse": "kaese",
+    "Pizza Belag": "belag",
+    "Versandkosten": "versand",
 
-serviceRouter.get("/pizza/config", function (request, response) {
-    console.log("Service PizzaConfig: Client requested configuration data");
+    "Pizza des Tages": "produkt",
+    "Saisonpizza": "produkt"
+};
 
-    const produktDao = new ProduktDao(request.app.locals.dbConnection);
+router.get("/pizzaconfig/load", (req, res) => {
+    const db = req.app.locals.dbConnection;
+    const produktDao = new ProduktDao(db);
 
     try {
-        const produkte = produktDao.loadAll();
+        const allProducts = produktDao.loadAll();
 
-        // Struktur für JS / Frontend-Konfigurator
-        const data = {
-            size: {},
-            dough: {},
-            sauce: {},
-            cheese: {},
-            toppings: {},
-            shippingFlat: 0
+        // produkt hinzugefügt – für script.js
+        const grouped = {
+            groesse: [],
+            teig: [],
+            sosse: [],
+            kaese: [],
+            belag: [],
+            versand: [],
+            produkt: []
         };
 
-        produkte.forEach((p) => {
-            const cat = p.kategorie.bezeichnung;
+        for (const p of allProducts) {
+            const catName = p.kategorie?.bezeichnung?.trim() || "";
+            const key = CATEGORY_MAP[catName];
 
-            switch (cat) {
-                case "Pizza Größe":
-                    data.size[p.bezeichnung] = p.preis;
-                    break;
-
-                case "Pizza Teig":
-                    data.dough[p.bezeichnung] = p.preis;
-                    break;
-
-                case "Pizza Soße":
-                    data.sauce[p.bezeichnung] = p.preis;
-                    break;
-
-                case "Pizza Käse":
-                    data.cheese[p.bezeichnung] = p.preis;
-                    break;
-
-                case "Pizza Belag":
-                    data.toppings[p.bezeichnung] = p.preis;
-                    break;
-
-                case "Versand":
-                    if (p.bezeichnung === "shippingFlat")
-                        data.shippingFlat = p.preis;
-                    break;
+            if (key) {
+                grouped[key].push({
+                    id: p.id,
+                    bezeichnung: p.bezeichnung,
+                    beschreibung: p.beschreibung,
+                    details: p.details,
+                    kategorieId: p.kategorie.id,  //für daily/season detection
+                    bruttopreis: p.bruttopreis !== undefined ? Number(p.bruttopreis) : null,
+                    nettopreis: p.nettopreis !== undefined ? Number(p.nettopreis) : null,
+                    rabatt: p.rabatt !== undefined ? Number(p.rabatt) : 0,
+                    bilder: p.bilder || [],
+                    mehrwertsteuer: p.mehrwertsteuer ? p.mehrwertsteuer.steuerSatz : null
+                });
             }
+        }
+
+        res.json({
+            erfolg: true,
+            daten: grouped
         });
 
-        console.log("Service PizzaConfig: OK - sending data");
-        response.status(200).json(data);
-    } catch (ex) {
-        console.error("Service PizzaConfig: Error", ex.message);
-        response.status(400).json({
-            fehler: true,
-            nachricht: ex.message,
+    } catch (err) {
+        console.error("pizzaconfig/load error:", err);
+        res.status(500).json({
+            erfolg: false,
+            fehler: err.message
         });
     }
 });
 
-module.exports = serviceRouter;
+module.exports = router;

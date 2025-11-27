@@ -1,703 +1,555 @@
-/* --------------------------------------------------------------------------
- * 1) Globale Konfiguration (Preise, Texte, Storage-Key, MwSt.)
- * -------------------------------------------------------------------------- */
-const CONFIG = {
-  // Gesetzliche Mehrwertsteuer (z. B. 19%)
-  vatRate: 0.19,
+/****************************************************
+ * Dynamischer Pizza-Konfigurator – Byte & Bite
+ * Backend-API: /api/pizzaconfig/load
+ ****************************************************/
 
-  // Währungsdarstellung
-  currency: "€",
+console.log("Dynamic Pizza Configurator loaded.");
 
-  // Texte: Tagesangebote (Anzeige auf der Startseite)
-  texts: {
-    daily: {
-      0: "Heute haben wir Ruhetag. Wir freuen uns auf morgen!",
-      1: "Pizza Margherita mit frischem Basilikum (8,90 €)",
-      2: "Pizza Funghi mit Champignons und Kräutern (9,90 €)",
-      3: "Pizza BBQ Chicken mit Zwiebeln (11,90 €)",
-      4: "Pizza Verdure – buntes Gemüse (10,90 €)",
-      5: "Pizza Diavolo – scharf und würzig (11,50 €)",
-      6: "Trüffel-Pizza mit Rucola (12,90 €)"
+const API_URL = "http://localhost:8000/api/pizzaconfig/load";
+
+let PIZZA_DATA = null;
+let STATE = {};
+let CART = [];
+
+/****************************************************
+ * 1. Daten vom Backend laden
+ ****************************************************/
+async function loadPizzaConfig() {
+    try {
+        const res = await fetch(API_URL);
+        const data = await res.json();
+
+        if (!data.erfolg) throw new Error("Backend meldet Fehler");
+
+        PIZZA_DATA = data.daten;
+        console.log("Pizza-Konfiguration geladen:", PIZZA_DATA);
+
+        // Nur laden, wenn es die jeweiligen Bereiche gibt
+        if (isConfiguratorPage()) {
+            buildConfiguratorUI();
+            applyPresetIfExists();
+            attachEventHandlers();
+            updatePriceUI();
+        }
+
+        loadCartFromStorage();
+
+        // Wird immer ausgeführt – aber nur, wenn auf der index.html Elemente vorhanden sind
+        renderDailyPizzaOnIndex();
+        renderSeasonPizzaOnIndex();
+
+    } catch (err) {
+        console.error("Fehler beim Laden der Konfiguration:", err);
     }
-  },
-
-  // Vorkonfigurierte Presets für "Pizza des Tages" (werden per LocalStorage in den Konfigurator übergeben)
-  dailySpecials: {
-    1: {size:"30", dough:"italian", sauce:"tomato", cheeses:["mozzarella"], toppings:["basil"], note:"Pizza des Tages: Margherita", qty:1},
-    2: {size:"30", dough:"italian", sauce:"tomato", cheeses:["mozzarella"], toppings:["mushrooms"], note:"Pizza des Tages: Funghi", qty:1},
-    3: {size:"30", dough:"american", sauce:"bbq", cheeses:["cheddar"], toppings:["chicken","onion"], note:"Pizza des Tages: BBQ Chicken", qty:1},
-    4: {size:"30", dough:"italian", sauce:"tomato", cheeses:["mozzarella"], toppings:["paprika","rucola","corn","mushrooms","olives"], note:"Pizza des Tages: Verdure", qty:1},
-    5: {size:"30", dough:"italian", sauce:"tomato", cheeses:["mozzarella"], toppings:["peperoni","onion"], note:"Pizza des Tages: Diavolo", qty:1},
-    6: {size:"30", dough:"italian", sauce:"oilherbs", cheeses:["mozzarella"], toppings:["rucola","porcini"], note:"Pizza des Tages: Trüffel & Rucola", qty:1}
-  },
-
-  // Preisliste (Nettopreise). Versandkosten flat: shippingFlat.
-  prices: {
-    size: { "26": 6.5, "30": 8.5, "36": 10.5 },
-    dough: { american: 0.5, italian: 0, glutenfree: 1.0 },
-    sauce: { tomato: 0, white: 0.5, bbq: 0.5, oilherbs: 0.3 },
-    cheese: { mozzarella: 0, cheddar: 0.5, goat: 1.0 },
-    toppings: {
-      salami: 1.2, ham: 1.0, parma: 1.5, chicken: 1.4,
-      porcini: 1.2, paprika: 0.8, onion: 0.5, olives: 0.9,
-      rucola: 0.7, peperoni: 0.7, corn: 0.6, mushrooms: 0.8
-    },
-    shippingFlat: 0
-  },
-
-  // LocalStorage-Schlüssel für Warenkorb
-  storageKey: "lecker_v3_cart",
-
-  // Storage für letzte Bestellzusammenfassung (Thankyou-Seite)
-  lastOrderKey: "lecker_v3_lastOrder"
-};
-
-/* --------------------------------------------------------------------------
- * 2) Hilfsfunktionen
- * -------------------------------------------------------------------------- */
-
-/** Brutto aus Netto mit MwSt. */
-function applyVAT(net){ return net * (1 + (CONFIG.vatRate || 0)); }
-
-/** Netto aus Brutto (Fallback für Alt-Daten im LocalStorage) */
-function removeVAT(gross){ return gross / (1 + (CONFIG.vatRate || 0)); }
-
-/** Formatiert eine Zahl als Euro mit 2 Dezimalstellen (Deutsch: Komma) */
-function euro(n){ return n.toFixed(2).replace(".", ",") + " " + CONFIG.currency; }
-
-/** Liefert die Werte aller angehakten Eingaben (Checkboxen) für einen Selektor */
-function checkedValues(selector){ return Array.from(document.querySelectorAll(selector + ":checked")).map(el => el.value); }
-
-/** Liest den Warenkorb aus LocalStorage (robust gegen kaputte Inhalte) */
-function loadCart(){ try { return JSON.parse(localStorage.getItem(CONFIG.storageKey) || "[]"); } catch { return []; } }
-
-/** Speichert den übergebenen Warenkorb im LocalStorage */
-function saveCart(items){ localStorage.setItem(CONFIG.storageKey, JSON.stringify(items)); }
-
-/** Speichert die letzte Bestell-Zusammenfassung für thankyou.html */
-function saveLastOrderSummary(data){
-  localStorage.setItem(CONFIG.lastOrderKey, JSON.stringify(data));
 }
 
-/** Holt die letzte Bestell-Zusammenfassung */
-function loadLastOrderSummary(){
-  try { return JSON.parse(localStorage.getItem(CONFIG.lastOrderKey) || "null"); } catch { return null; }
+/****************************************************
+ * Hilfsfunktion: Prüfen ob Konfigurator geladen werden soll
+ ****************************************************/
+function isConfiguratorPage() {
+    return document.getElementById("size") !== null;
+}
+//neu
+/****************************************************
+ * 2. DB-Daten zu Tages- & Saisonpizza
+ ****************************************************/
+function getAllProducts() {
+    if (!PIZZA_DATA) return [];
+    return [
+        ...PIZZA_DATA.groesse,
+        ...PIZZA_DATA.teig,
+        ...PIZZA_DATA.sosse,
+        ...PIZZA_DATA.kaese,
+        ...PIZZA_DATA.belag,
+        ...(PIZZA_DATA.produkt || [])
+    ];
 }
 
-/** Erzeugt eine menschenlesbare Beschreibung einer Pizza-Konfiguration */
-function pizzaLabel(item){
-  const cheeseTxt = item.cheeses?.length ? " • Käse: " + item.cheeses.join(", ") : "";
-  const topsTxt = item.toppings?.length ? " • Beläge: " + item.toppings.join(", ") : "";
-  const noteTxt = item.note ? ` • Hinweis: ${item.note}` : "";
-  return `Pizza (${item.size}cm, ${item.dough}, ${item.sauce}${cheeseTxt}${topsTxt}${noteTxt})`;
+function getDailyPizzaFromDB() {
+    if (!PIZZA_DATA?.produkt) return null;
+
+    const weekly = PIZZA_DATA.produkt.filter(p => p.kategorieId == 16);
+    if (weekly.length === 0) return null;
+
+    const weekday = new Date().getDay(); // 0=So ... 6=Sa
+    const sorted = weekly.sort((a, b) => a.id - b.id);
+
+    return sorted[weekday] || sorted[0];
 }
 
-/* --------------------------------------------------------------------------
- * 3) DOM-Ready: Initialisierung pro Seite (Startseite, Konfigurator, Warenkorb,
- *    Kasse, Danke-Seite, Kontakt)
- * -------------------------------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", () => {
+function getSeasonPizzaFromDB() {
+    if (!PIZZA_DATA?.produkt) return null;
 
-  /* ----- 3.1 Footer-Jahreszahl setzen ----- */
-  const yearEl = document.getElementById("year");
-  if (yearEl) yearEl.textContent = new Date().getFullYear();
+    const seasonal = PIZZA_DATA.produkt.filter(p => p.kategorieId == 17);
+    if (seasonal.length === 0) return null;
 
-  /* ----- 3.2 Startseite: Pizza des Tages inkl. Deep-Link in den Konfigurator ----- */
-  const dailyEl = document.getElementById("daily-special");
-  if (dailyEl){
-    const today = new Date().getDay(); // 0=Sonntag, 1=Montag, ...
-    dailyEl.textContent = CONFIG.texts.daily[today];
+    const month = new Date().getMonth();
+    let season = "Frühling";
 
-    // Wenn ein Preset vorhanden ist: Button einfügen, der die Konfiguration übergibt
-    const preset = CONFIG.dailySpecials[today];
-    if (preset){
-      const link = document.createElement('a');
-      link.href = 'configurator.html';
-      link.textContent = 'Jetzt auswählen';
-      link.className = 'btn-primary';
-      link.style.marginLeft = '0.6rem';
+    if (month >= 2 && month <= 4) season = "Frühling";
+    else if (month >= 5 && month <= 7) season = "Sommer";
+    else if (month >= 8 && month <= 10) season = "Herbst";
+    else season = "Winter";
 
-      const wrap = document.createElement('span');
-      wrap.className = 'daily-wrap';
-      wrap.appendChild(document.createTextNode(' '));
-      wrap.appendChild(link);
+    return seasonal.find(p => p.bezeichnung.startsWith(season)) || seasonal[0];
+}
 
-      dailyEl.appendChild(wrap);
+/****************************************************
+ * 3. Beschreibung → Zutaten IDs
+ ****************************************************/
+function parseIngredients(desc) {
+    if (!desc) return { sauce: null, cheese: [], toppings: [] };
 
-      link.addEventListener('click', (e) => {
-        e.preventDefault();
-        // Pending-Konfiguration speichern und dann auf den Konfigurator leiten
-        localStorage.setItem(CONFIG.storageKey + "_pending", JSON.stringify(preset));
-        window.location.href = link.href;
-      });
-    }
-  }
+    const parts = desc.split(",").map(x => x.trim().toLowerCase());
 
-  /* ----- 3.3 Konfigurator: Live-Preise, in den Warenkorb legen, Mini-Warenkorb ----- */
-  const priceEl = document.getElementById("price");
-  const sizeEl = document.getElementById("size");
-  const doughEl = document.getElementById("dough");
-  const sauceEl = document.getElementById("sauce");
-  const qtyEl = document.getElementById("qty");
-  const noteEl = document.getElementById("note");
-  const addBtn = document.getElementById("add-to-cart");
+    const sauce = PIZZA_DATA.sosse.find(s =>
+        parts.includes(s.beschreibung.toLowerCase())
+    )?.id || 41;
 
-  const miniList = document.getElementById("mini-cart-list");
+    const cheese = PIZZA_DATA.kaese
+        .filter(k => parts.includes(k.beschreibung.toLowerCase()))
+        .map(x => x.id);
 
-  // Vorkonfiguration aus "Pizza des Tages" übernehmen (falls vorhanden)
-  try {
-    const pendingRaw = localStorage.getItem(CONFIG.storageKey + "_pending");
-    if (pendingRaw && sizeEl && doughEl && sauceEl){
-      const p = JSON.parse(pendingRaw);
-      // Größe
-      sizeEl.value = p.size || sizeEl.value;
-      // Teig (Mapping für Text/Keys)
-      const doughMap = { "Amerikanisch – dick & fluffig": "american", "Italienisch – dünn & knusprig": "italian", "Glutenfrei": "glutenfree", "american":"american", "italian":"italian", "glutenfree":"glutenfree" };
-      doughEl.value = doughMap[p.dough] || p.dough || doughEl.value;
-      // Soße
-      const sauceMap = { "Mediterrane Tomatensoße":"tomato", "Weiße Soße mit Crème fraîche":"white", "BBQ-Soße":"bbq", "Olivenöl mit Kräutern":"oilherbs", "tomato":"tomato","white":"white","bbq":"bbq","oilherbs":"oilherbs" };
-      sauceEl.value = sauceMap[p.sauce] || p.sauce || sauceEl.value;
-      // Käse
-      document.querySelectorAll('input.cheese').forEach(ch => ch.checked = false);
-      (p.cheeses || []).forEach(name => {
-        const map = { "Mozzarella":"mozzarella", "Cheddar":"cheddar", "Ziegenkäse":"goat", "mozzarella":"mozzarella", "cheddar":"cheddar", "goat":"goat" };
-        const val = map[name] || name;
-        const el = document.querySelector('input.cheese[value="'+val+'"]');
-        if (el) el.checked = true;
-      });
-      // Beläge
-      document.querySelectorAll('input.topping').forEach(tp => tp.checked = false);
-      (p.toppings || []).forEach(name => {
-        const map = {"Salami":"salami","Hinterschinken":"ham","Parmaschinken":"parma","Hähnchen":"chicken","Steinpilze":"porcini","Paprika":"paprika","Zwiebeln":"onion","Oliven":"olives","Rucola":"rucola","Peperoni":"peperoni","Mais":"corn","Champignons":"mushrooms","salami":"salami","ham":"ham","parma":"parma","chicken":"chicken","porcini":"porcini","paprika":"paprika","onion":"onion","olives":"olives","rucola":"rucola","peperoni":"peperoni","corn":"corn","mushrooms":"mushrooms"};
-        const val = map[name] || name;
-        const el = document.querySelector('input.topping[value="'+val+'"]');
-        if (el) el.checked = true;
-      });
-      // Menge & Hinweis
-      if (qtyEl) qtyEl.value = p.qty || 1;
-      if (noteEl && p.note) noteEl.value = p.note;
-      // Pending wieder löschen & Preis neu berechnen
-      localStorage.removeItem(CONFIG.storageKey + "_pending");
-      if (typeof calcAndRenderPrice === 'function') calcAndRenderPrice();
-    }
-  } catch{}
+    const toppings = PIZZA_DATA.belag
+        .filter(b => parts.includes(b.beschreibung.toLowerCase()))
+        .map(x => x.id);
 
-  const miniEmpty = document.getElementById("mini-cart-empty");
-  const miniSummary = document.getElementById("mini-cart-summary");
-  const miniTotal = document.getElementById("mini-cart-total");
+    return { sauce, cheese, toppings };
+}
 
-  if (priceEl && sizeEl && doughEl && sauceEl && qtyEl && addBtn){
-    // Preisberechnung pro Pizza (Netto)
-    function calcUnit(){
-      let unit = 0;
-      unit += CONFIG.prices.size[sizeEl.value] || 0;
-      unit += CONFIG.prices.dough[doughEl.value] || 0;
-      unit += CONFIG.prices.sauce[sauceEl.value] || 0;
-      checkedValues("input.cheese").forEach(c => unit += CONFIG.prices.cheese[c] || 0);
-      checkedValues("input.topping").forEach(t => unit += CONFIG.prices.toppings[t] || 0);
-      return unit;
-    }
+function buildPresetFromProduct(p) {
+    const ing = parseIngredients(p.details || p.beschreibung);
 
-    // Gesamtsumme (Brutto) rendern (inkl. MwSt.-Hinweis)
-    function calcAndRenderPrice(){
-      const qty = Math.max(1, parseInt(qtyEl.value || "1", 10));
-      const totalNet = calcUnit() * qty;
-      const totalGross = applyVAT(totalNet);
-      priceEl.textContent = euro(totalGross) + " (inkl. MwSt.)";
-      return totalGross;
-    }
+    return {
+        size: 36,
+        dough: 39,
+        sauce: ing.sauce,
+        cheese: ing.cheese,
+        toppings: ing.toppings,
+        qty: 1
+    };
+}
 
-    // Live-Aktualisierung bei Änderungen
-    ["change","input"].forEach(ev => {
-      document.body.addEventListener(ev, (e) => {
-        if (e.target.closest("main")) calcAndRenderPrice();
-      }, true);
+/****************************************************
+ * 4. Konfigurator UI mit Backend erzeugen (im Konfigurator)
+ ****************************************************/
+function buildConfiguratorUI() {
+    if (!isConfiguratorPage()) return;
+
+    const sizeSelect = document.getElementById("size");
+    sizeSelect.innerHTML = "";
+    PIZZA_DATA.groesse.forEach(p => {
+        sizeSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
     });
-    calcAndRenderPrice();
 
-    // Artikel in den Warenkorb legen (stilles Hinzufügen; kein Popup)
-    addBtn.addEventListener("click", () => {
-  const item = {
-    size: sizeEl.value,
-    dough: doughEl.options[doughEl.selectedIndex].text,
-    sauce: sauceEl.options[sauceEl.selectedIndex].text,
-    cheeses: checkedValues("input.cheese").map(v => ({mozzarella:"Mozzarella", cheddar:"Cheddar", goat:"Ziegenkäse"}[v] || v)),
-    toppings: checkedValues("input.topping").map(v => ({
-      salami:"Salami", ham:"Hinterschinken", parma:"Parmaschinken", chicken:"Hähnchen",
-      porcini:"Steinpilze", paprika:"Paprika", onion:"Zwiebeln", olives:"Oliven",
-      rucola:"Rucola", peperoni:"Peperoni", corn:"Mais", mushrooms:"Champignons"
-    }[v] || v)),
-    note: (noteEl?.value || "").trim(),
-    qty: Math.max(1, parseInt(qtyEl.value || "1", 10))
-  };
+    const doughSelect = document.getElementById("dough");
+    doughSelect.innerHTML = "";
+    PIZZA_DATA.teig.forEach(p => {
+        doughSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
+    });
 
-  const unitNet = calcUnit();
-  const unitGross = applyVAT(unitNet);
+    const sauceSelect = document.getElementById("sauce");
+    sauceSelect.innerHTML = "";
+    PIZZA_DATA.sosse.forEach(p => {
+        sauceSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
+    });
 
-  item.unitNet = unitNet;
-  item.unit = unitGross;
-  item.totalNet = unitNet * item.qty;
-  item.total = unitGross * item.qty;
+    const cheeseFieldset = document.querySelectorAll("fieldset")[0];
+    cheeseFieldset.innerHTML = `<legend>Käse</legend>`;
+    PIZZA_DATA.kaese.forEach(p => {
+        cheeseFieldset.innerHTML += `
+        <label class="chip">
+            <input type="checkbox" class="cheese" value="${p.id}">
+            ${p.beschreibung}
+        </label>`;
+    });
 
-  const cart = loadCart();
+    const toppingsFieldset = document.querySelectorAll("fieldset")[1];
+    toppingsFieldset.innerHTML = `<legend>Beläge</legend>`;
+    PIZZA_DATA.belag.forEach(p => {
+        toppingsFieldset.innerHTML += `
+        <label class="chip">
+            <input type="checkbox" class="topping" value="${p.id}">
+            ${p.beschreibung}
+        </label>`;
+    });
+}
 
-  // Prüfen, ob die gleiche Pizza schon existiert
-  const existing = cart.find(it =>
-    it.size === item.size &&
-    it.dough === item.dough &&
-    it.sauce === item.sauce &&
-    JSON.stringify(it.cheeses) === JSON.stringify(item.cheeses) &&
-    JSON.stringify(it.toppings) === JSON.stringify(item.toppings) &&
-    it.note === item.note
-  );
+/****************************************************
+ * 5. Preset im Konfigurator anwenden
+ ****************************************************/
+function applyPresetIfExists() {
+    if (!isConfiguratorPage()) return;
 
-  if (existing) {
-    // Gleiche Pizza gefunden -> Menge erhöhen
-    existing.qty += item.qty;
-    existing.totalNet = existing.unitNet * existing.qty;
-    existing.total    = existing.unit * existing.qty;
-  } else {
-    cart.push(item);
-  }
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("preset")) return;
 
-  saveCart(cart);
-  renderMiniCart();
-  calcAndRenderPrice();
-});
+    let product = null;
 
-// Mini-Warenkorb rendern
+    if (params.get("preset") === "daily")
+        product = getDailyPizzaFromDB();
+
+    if (params.get("preset") === "season")
+        product = getSeasonPizzaFromDB();
+
+    if (!product) return;
+
+    const preset = buildPresetFromProduct(product);
+
+    document.getElementById("size").value = preset.size;
+    document.getElementById("dough").value = preset.dough;
+    document.getElementById("sauce").value = preset.sauce;
+
+    document.querySelectorAll(".cheese").forEach(el => {
+        el.checked = preset.cheese.includes(Number(el.value));
+    });
+
+    document.querySelectorAll(".topping").forEach(el => {
+        el.checked = preset.toppings.includes(Number(el.value));
+    });
+
+    updatePriceUI();
+}
+
+/****************************************************
+ * 6. Index: Tages- & Saisonpizza anzeigen
+ ****************************************************/
+function euro(v) {
+    return v.toFixed(2) + " €";
+}
+
+function renderDailyPizzaOnIndex() {
+    const el = document.getElementById("daily-special");
+    if (!el || !PIZZA_DATA?.produkt) return;
+
+    const p = getDailyPizzaFromDB();
+    if (!p) {
+        el.textContent = "Keine Pizza des Tages gefunden.";
+        return;
+    }
+
+    el.innerHTML = `
+        <strong>${p.bezeichnung}</strong><br>
+        ${p.beschreibung}<br>
+        Preis: <strong>${euro(p.nettopreis * 1.19)}</strong><br>
+        <a href="configurator.html?preset=daily">Jetzt konfigurieren →</a>
+    `;
+}
+
+function renderSeasonPizzaOnIndex() {
+    const el = document.getElementById("seasonal-special");
+    if (!el || !PIZZA_DATA?.produkt) return;
+
+    const p = getSeasonPizzaFromDB();
+    if (!p) {
+        el.textContent = "Keine Saisonpizza gefunden.";
+        return;
+    }
+
+    el.innerHTML = `
+        <strong>${p.bezeichnung}</strong><br>
+        ${p.beschreibung}<br>
+        Preis: <strong>${euro(p.nettopreis * 1.19)}</strong><br>
+        <a href="configurator.html?preset=season">Jetzt konfigurieren →</a>
+    `;
+}
+
+/****************************************************
+ * 7. Auswahl-State erfassen
+ ****************************************************/
+function collectState() {
+    if (!isConfiguratorPage()) return;
+
+    STATE = {
+        size: document.getElementById("size").value,
+        dough: document.getElementById("dough").value,
+        sauce: document.getElementById("sauce").value,
+        cheese: Array.from(document.querySelectorAll(".cheese:checked")).map(n => n.value),
+        toppings: Array.from(document.querySelectorAll(".topping:checked")).map(n => n.value),
+        qty: parseInt(document.getElementById("qty").value) || 1,
+        note: document.getElementById("note").value
+    };
+}
+
+/****************************************************
+ * 8. Preis berechnen
+ ****************************************************/
+function findProductById(id) {
+    id = Number(id);
+    return getAllProducts().find(p => p.id === id);
+}
+
+function calculatePrice() {
+    if (!isConfiguratorPage()) return 0;
+
+    collectState();
+    let total = 0;
+
+    total += findProductById(STATE.size)?.bruttopreis || 0;
+    total += findProductById(STATE.dough)?.bruttopreis || 0;
+    total += findProductById(STATE.sauce)?.bruttopreis || 0;
+
+    STATE.cheese.forEach(id => total += findProductById(id)?.bruttopreis || 0);
+    STATE.toppings.forEach(id => total += findProductById(id)?.bruttopreis || 0);
+
+    return total * STATE.qty;
+}
+
+function updatePriceUI() {
+    if (!isConfiguratorPage()) return;
+
+    const priceEl = document.getElementById("price");
+    if (priceEl) priceEl.textContent = euro(calculatePrice());
+}
+
+/****************************************************
+ * 9. Mini-Warenkorb
+ ****************************************************/
+function loadCartFromStorage() {
+    CART = JSON.parse(localStorage.getItem("cart") || "[]");
+    renderMiniCart();
+}
+
+function saveCart() {
+    localStorage.setItem("cart", JSON.stringify(CART));
+}
+
 function renderMiniCart() {
-  if (!miniList || !miniEmpty || !miniSummary || !miniTotal) return;
+    const empty = document.getElementById("mini-cart-empty");
+    if (!empty) return; // Nicht auf der Startseite
 
-  const cart = loadCart();
-  miniList.innerHTML = "";
+    const list = document.getElementById("mini-cart-list");
+    const summary = document.getElementById("mini-cart-summary");
 
-  if (cart.length === 0) {
-    miniEmpty.style.display = "block";
-    miniSummary.style.display = "none";
-    miniTotal.textContent = euro(0);
-    return;
-  }
-
-  miniEmpty.style.display = "none";
-  miniSummary.style.display = "flex";
-
-  let sum = 0;
-
-  cart.forEach(it => {
-    sum += it.unit * it.qty;
-
-    const li = document.createElement("li");
-    li.innerHTML = `<span class="small">${it.qty} × ${pizzaLabel(it)}</span> <strong>${euro(it.unit * it.qty)}</strong>`;
-    miniList.appendChild(li);
-  });
-
-  miniTotal.textContent = euro(sum);
-}
-renderMiniCart();
-}
-
-  /* ----- 3.4 Warenkorb-Seite: Tabelle rendern, Mengen ändern, entfernen, Summen ----- */
-  const cartTable = document.getElementById("cart-table");
-  const cartBody = document.getElementById("cart-body");
-  const cartEmpty = document.getElementById("cart-empty");
-
-  // neue IDs lt. Anforderung (Warenkorb)
-  const cartNet = document.getElementById("cart-net");
-  const cartShipping = document.getElementById("cart-shipping");
-  const cartSubtotal = document.getElementById("cart-subtotal");
-  const cartVAT = document.getElementById("cart-vat");
-  const cartTotal = document.getElementById("cart-total");
-
-  if (cartTable && cartBody && cartEmpty && cartSubtotal && cartTotal){
-    // Leeren Warenkorb abfangen: "Zur Kasse" nur wenn Artikel im Warenkorb liegen
-    const cartToCheckoutLink = document.querySelector('a[href="checkout.html"].btn-primary.fullwidth');
-    if (cartToCheckoutLink){
-      cartToCheckoutLink.addEventListener("click", (e) => {
-        const items = loadCart();
-        if (!items || items.length === 0){
-          e.preventDefault();
-          alert("Ihr Warenkorb ist leer.");
-        }
-      });
+    if (!CART.length) {
+        empty.style.display = "block";
+        list.innerHTML = "";
+        summary.style.display = "none";
+        return;
     }
 
-    // Hilfsfunktion: Summen neu berechnen & anzeigen (inkl. Netto/Brutto-Schema)
-    function renderTotals(items){
-      // Summe Netto & Brutto aus Positionen bilden
-      let sumNet = 0;
-      let sumGross = 0;
+    empty.style.display = "none";
+    summary.style.display = "block";
 
-      items.forEach(it => {
-        // Fallbacks für ältere Cart-Einträge ohne totalNet/unitNet
-        const itTotalGross = Number(it.total) || 0;
-        const itTotalNet = (it.totalNet !== undefined)
-          ? Number(it.totalNet)
-          : removeVAT(itTotalGross);
+    list.innerHTML = "";
+    let sum = 0;
 
-        sumGross += itTotalGross;
-        sumNet += itTotalNet;
-      });
+    CART.forEach(item => {
+        const li = document.createElement("li");
+        li.className = "mini-cart-item";
+        li.innerHTML = `
+            <span>${item.qty}× ${item.text}</span>
+            <strong>${euro(item.total)}</strong>
+        `;
+        list.appendChild(li);
+        sum += item.total;
+    });
 
-      // Versandkosten sind Nettopreise laut CONFIG
-      const shippingNet = CONFIG.prices.shippingFlat || 0;
+    document.getElementById("mini-cart-total").textContent = euro(sum);
+}
 
-      const subtotalNet = sumNet + shippingNet; // Nettobetrag + Lieferung
-      const vatAmount = subtotalNet * (CONFIG.vatRate || 0);
-      const grossTotal = subtotalNet + vatAmount;
+/****************************************************
+ * 10. In den Warenkorb legen (gleiche Produkte werden zusammengefasst)
+ ****************************************************/
+function addToCart() {
+    if (!isConfiguratorPage()) return;
 
-      if (cartNet)       cartNet.textContent = euro(sumNet);        // Nettobetrag (nur Artikel)
-      if (cartShipping)  cartShipping.textContent = euro(shippingNet); // Lieferung netto
-      if (cartSubtotal)  cartSubtotal.textContent = euro(subtotalNet); // Zwischensumme netto inkl. Lieferung
-      if (cartVAT)       cartVAT.textContent = euro(vatAmount);     // MwSt.
-      if (cartTotal)     cartTotal.textContent = euro(grossTotal);  // Bruttobetrag (Endpreis)
+    collectState();
+    const total = calculatePrice();
+
+    // Neue Pizza (sortierte Arrays für Vergleich)
+    const newItem = {
+        size: STATE.size,
+        dough: STATE.dough,
+        sauce: STATE.sauce,
+        cheese: [...STATE.cheese].sort(),
+        toppings: [...STATE.toppings].sort(),
+        qty: STATE.qty,
+        note: STATE.note.trim(),
+        total: total
+    };
+
+    // Prüfen nach identischer Pizza
+    const duplicate = CART.find(item =>
+        item.size === newItem.size &&
+        item.dough === newItem.dough &&
+        item.sauce === newItem.sauce &&
+        item.note === newItem.note &&
+        JSON.stringify(item.cheese) === JSON.stringify(newItem.cheese) &&
+        JSON.stringify(item.toppings) === JSON.stringify(newItem.toppings)
+    );
+
+    if (duplicate) {
+        // wenn ja, Menge erhöhen
+        duplicate.qty += newItem.qty;
+        duplicate.total += newItem.total;
+
+        // sonst neuen Text erzeugen (inkl. Menge)
+        duplicate.text = generatePizzaTextFromObject(duplicate);
+    } else {
+        // Text einmalig erzeugen
+        newItem.text = generatePizzaTextFromObject(newItem);
+        CART.push(newItem);
     }
 
-    // Haupt-Renderer für die Warenkorbtabelle
-    function renderCart(){
-      const items = loadCart();
-      cartBody.innerHTML = "";
-      if (items.length === 0){
-        cartEmpty.style.display = "block";
-        cartTable.style.display = "none";
-      } else {
-        cartEmpty.style.display = "none";
-        cartTable.style.display = "table";
-      }
+    saveCart();
+    renderMiniCart();
+}
 
-      items.forEach((it, idx) => {
-        // Fallback für alte Daten ohne unitNet:
-        if (it.unitNet === undefined && it.unit !== undefined){
-          // 'unit' ist Brutto => Netto ableiten
-          it.unitNet = removeVAT(it.unit);
-        }
-        if (it.totalNet === undefined && it.total !== undefined){
-          it.totalNet = removeVAT(it.total);
-        }
+/****************************************************
+ * Hilfsfunktion: Text für zusammengefasste Pizza
+ ****************************************************/
+function generatePizzaTextFromObject(item) {
+    const size = findProductById(item.size)?.beschreibung;
+    const dough = findProductById(item.dough)?.beschreibung;
+    const sauce = findProductById(item.sauce)?.beschreibung;
+
+    const cheese = item.cheese
+        .map(id => findProductById(id)?.beschreibung)
+        .join(", ");
+
+    const toppings = item.toppings
+        .map(id => findProductById(id)?.beschreibung)
+        .join(", ");
+
+    const noteText = item.note
+        ? `<br><em>Anmerkung: ${item.note}</em>`
+        : "";
+
+    return `${size}, ${dough}, ${sauce}, Käse: ${cheese}, Beläge: ${toppings}${noteText}`;
+}
+
+
+/****************************************************
+ * 11. Event-Handler
+ ****************************************************/
+function attachEventHandlers() {
+    if (!isConfiguratorPage()) return;
+
+    const sizeEl = document.getElementById("size");
+    const doughEl = document.getElementById("dough");
+    const sauceEl = document.getElementById("sauce");
+    const qtyEl = document.getElementById("qty");
+    const addBtn = document.getElementById("add-to-cart");
+
+    if (sizeEl) sizeEl.addEventListener("change", updatePriceUI);
+    if (doughEl) doughEl.addEventListener("change", updatePriceUI);
+    if (sauceEl) sauceEl.addEventListener("change", updatePriceUI);
+    if (qtyEl) qtyEl.addEventListener("input", updatePriceUI);
+
+    document.querySelectorAll(".cheese, .topping").forEach(el =>
+        el.addEventListener("change", updatePriceUI)
+    );
+
+    if (addBtn) addBtn.addEventListener("click", addToCart);
+}
+
+/****************************************************
+ * 12. Warenkorb-Seite rendern
+ ****************************************************/
+function renderCartPage() {
+    const cartBody = document.getElementById("cart-body");
+    if (!cartBody) return;
+
+    const empty = document.getElementById("cart-empty");
+    const table = document.getElementById("cart-table");
+
+    loadCartFromStorage();
+
+    if (CART.length === 0) {
+        empty.style.display = "block";
+        table.style.display = "none";
+
+        document.getElementById("cart-net").textContent = "0,00 €";
+        document.getElementById("cart-shipping").textContent = "0,00 €";
+        document.getElementById("cart-subtotal").textContent = "0,00 €";
+        document.getElementById("cart-vat").textContent = "0,00 €";
+        document.getElementById("cart-total").textContent = "0,00 €";
+
+        return;
+    }
+
+    empty.style.display = "none";
+    table.style.display = "table";
+
+    let net = 0;
+    cartBody.innerHTML = "";
+
+    CART.forEach((item, index) => {
+        net += item.total;
 
         const tr = document.createElement("tr");
         tr.innerHTML = `
-          <td>
-            <div><strong>${pizzaLabel(it)}</strong></div>
-            <div class="small">Einzelpreis: ${euro(it.unit || 0)}</div>
-          </td>
-          <td><input type="number" class="cart-qty" data-idx="${idx}" min="1" value="${it.qty}"/></td>
-          <td>${euro(it.total || 0)}</td>
-          <td><button class="btn-secondary remove" data-idx="${idx}">Entfernen</button></td>
+            <td>${item.text}</td>
+            <td>${item.qty}</td>
+            <td>${euro(item.total)}</td>
+            <td><button class="btn-secondary" data-i="${index}">X</button></td>
         `;
         cartBody.appendChild(tr);
-      });
-
-      renderTotals(items);
-
-      // Mengenänderungen live anwenden
-      cartBody.querySelectorAll(".cart-qty").forEach(inp => {
-        inp.addEventListener("change", (e) => {
-          const idx = +e.target.dataset.idx;
-          const qty = Math.max(1, parseInt(e.target.value || "1", 10));
-          const items = loadCart();
-          const it = items[idx];
-          if (!it) return;
-          it.qty = qty;
-
-          // Wenn noch keine gespeicherten Netto-/Brutto-Einzelpreise vorhanden sind,
-          // aus vorhandenen Werten herleiten.
-          if (it.unitNet === undefined && it.unit !== undefined){
-            it.unitNet = removeVAT(it.unit);
-          }
-          if (it.unit === undefined && it.unitNet !== undefined){
-            it.unit = applyVAT(it.unitNet);
-          }
-
-          // Gesamtposition neu berechnen
-          it.totalNet = (it.unitNet || 0) * it.qty;
-          it.total    = (it.unit    || 0) * it.qty;
-
-          saveCart(items);
-          renderCart();
-        });
-      });
-
-      // Entfernen-Buttons
-      cartBody.querySelectorAll(".remove").forEach(btn => {
-        btn.addEventListener("click", (e) => {
-          const idx = +e.target.dataset.idx;
-          const items = loadCart();
-          items.splice(idx, 1);
-          saveCart(items);
-          renderCart();
-        });
-      });
-    }
-    renderCart();
-  }
-
-  /* ----- 3.5 Checkout: Zusammenfassung + Liefertermin-Logik + Absenden ----- */
-  const coList = document.getElementById("checkout-list");
-  const coNet = document.getElementById("checkout-net");
-  const coShipping = document.getElementById("checkout-shipping");
-  const coVAT = document.getElementById("checkout-vat");
-  const coTotal = document.getElementById("checkout-total");
-  const coForm = document.getElementById("checkout-form");
-
-  // Liefertermin-Felder
-  const coDateTimeEl = document.getElementById("co-datetime");
-  const coAsapEl = document.getElementById("co-asap");
-
-  // (a) Mindestzeitpunkt = jetzt + 1h
-  if (coDateTimeEl){
-    const oneHourMs = 60 * 60 * 1000;
-    const minDate = new Date(Date.now() + oneHourMs);
-
-    function pad(n){ return String(n).padStart(2,"0"); }
-    // datetime-local format: "YYYY-MM-DDTHH:MM"
-    const minVal = [
-      minDate.getFullYear(),
-      pad(minDate.getMonth()+1),
-      pad(minDate.getDate())
-    ].join("-") + "T" + pad(minDate.getHours()) + ":" + pad(minDate.getMinutes());
-
-    coDateTimeEl.min = minVal;
-  }
-
-  // (b) Ausgrauen bei "nächstmöglicher Zeitpunkt"
-  function applyAsapState(){
-    if (!coDateTimeEl || !coAsapEl) return;
-    if (coAsapEl.checked){
-      coDateTimeEl.classList.add("faded");
-      // Wenn Checkbox aktiv ist -> gewählten Zeitpunkt löschen
-      coDateTimeEl.value = "";
-      coDateTimeEl.required = false;
-    } else {
-      coDateTimeEl.classList.remove("faded");
-      coDateTimeEl.required = true;
-    }
-  }
-
-  if (coAsapEl){
-    coAsapEl.addEventListener("change", applyAsapState);
-  }
-  if (coDateTimeEl){
-    // Wenn der User das Feld aktiv klickt/fokussiert, Checkbox deaktivieren + Optik zurücksetzen
-    coDateTimeEl.addEventListener("focus", () => {
-      if (coAsapEl){
-        coAsapEl.checked = false;
-      }
-      applyAsapState();
     });
-  }
-  applyAsapState();
 
-  // (c) Bestellübersicht berechnen (Checkout-Seite)
-  if (coList && coTotal){
-    const items = loadCart();
-    coList.innerHTML = "";
+    document.getElementById("cart-net").textContent = euro(net);
+    document.getElementById("cart-shipping").textContent = euro(0);
+    document.getElementById("cart-subtotal").textContent = euro(net);
+    document.getElementById("cart-vat").textContent = euro(net * 0.19);
+    document.getElementById("cart-total").textContent = euro(net * 1.19);
 
-    // Summen bilden wie im Warenkorb (aber ohne Mengenänderung)
-    let sumNet = 0;
-    items.forEach(it => {
-  const itTotalGross = Number(it.total) || 0;
-  const itTotalNet = (it.totalNet !== undefined)
-    ? Number(it.totalNet)
-    : removeVAT(itTotalGross);
-  sumNet += itTotalNet;
+    document.querySelectorAll("[data-i]").forEach(btn =>
+        btn.addEventListener("click", e => {
+            const idx = e.target.dataset.i;
+            CART.splice(idx, 1);
+            saveCart();
+            renderCartPage();
+        })
+    );
+}
 
-  const li = document.createElement("li");
-  // Menge anzeigen
-  li.innerHTML = `<span class="small">${it.qty} × ${pizzaLabel(it)}</span> <strong>${euro(it.total)}</strong>`;
-  coList.appendChild(li);
-});
+/****************************************************
+ * 13. Checkout-Button absichern
+ ****************************************************/
+function protectCheckoutWhenCartEmpty() {
+    const checkoutBtn = document.querySelector(".btn-primary.fullwidth");
+    if (!checkoutBtn) return;
 
-
-    const shippingNet = CONFIG.prices.shippingFlat || 0;
-    const vatAmount = (sumNet + shippingNet) * (CONFIG.vatRate || 0);
-    const grossTotal = (sumNet + shippingNet) + vatAmount;
-
-    if (coNet)      coNet.textContent = euro(sumNet);
-    if (coShipping) coShipping.textContent = euro(shippingNet);
-    if (coVAT)      coVAT.textContent = euro(vatAmount);
-    if (coTotal)    coTotal.textContent = euro(grossTotal);
-  }
-
-  if (coForm){
-    // "Abschicken": Zusammenfassung speichern -> Warenkorb leeren -> Weiterleitung zur Danke-Seite
-    coForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-
-      // Aktuelle Summen berechnen
-      const items = loadCart();
-      let sumNet = 0;
-      items.forEach(it => {
-        const itTotalGross = Number(it.total) || 0;
-        const itTotalNet = (it.totalNet !== undefined)
-          ? Number(it.totalNet)
-          : removeVAT(itTotalGross);
-        sumNet += itTotalNet;
-      });
-      const shippingNet = CONFIG.prices.shippingFlat || 0;
-      const vatAmount = (sumNet + shippingNet) * (CONFIG.vatRate || 0);
-      const grossTotal = (sumNet + shippingNet) + vatAmount;
-
-      // Liefertermin-Text bestimmen
-      let deliveryText = "";
-      if (coAsapEl && coAsapEl.checked){
-        deliveryText = "nächstmöglicher Zeitpunkt";
-      } else if (coDateTimeEl && coDateTimeEl.value){
-        deliveryText = coDateTimeEl.value; // raw datetime-local String
-      } else {
-        deliveryText = "nicht angegeben";
-      }
-
-      // Infos für Thankyou speichern
-      saveLastOrderSummary({
-        net: sumNet,
-        shipping: shippingNet,
-        vat: vatAmount,
-        gross: grossTotal,
-        delivery: deliveryText
-      });
-
-      // Warenkorb leeren
-      saveCart([]);
-
-      // Weiterleiten zur Danke-Seite
-      window.location.href = "thankyou.html";
-    });
-  }
-
-  /* ----- 3.6 Danke-Seite (thankyou.html): Daten anzeigen ----- */
-  const tyNet = document.getElementById("ty-net");
-  const tyShipping = document.getElementById("ty-shipping");
-  const tyVat = document.getElementById("ty-vat");
-  const tyTotal = document.getElementById("ty-total");
-  const tyTime = document.getElementById("ty-time");
-
-  if (tyNet || tyShipping || tyVat || tyTotal || tyTime){
-    const summary = loadLastOrderSummary();
-    if (summary){
-      if (tyNet)     tyNet.textContent = euro(summary.net || 0);
-      if (tyShipping)tyShipping.textContent = euro(summary.shipping || 0);
-      if (tyVat)     tyVat.textContent = euro(summary.vat || 0);
-      if (tyTotal)   tyTotal.textContent = euro(summary.gross || 0);
-      
-  	  //Formatierung des Lieferdatums bei "thankyou"
-      if (tyTime) {
-      // Prüfen, ob der Text "nächstmöglicher Zeitpunkt" oder "nicht angegeben" ist.
-      // Diese Texte sollen 1:1 so angezeigt werden, weil sie keine Zeitangabe sind.
-      if (
-        summary.delivery === "nächstmöglicher Zeitpunkt" ||
-        summary.delivery === "nicht angegeben"
-      ) {
-        tyTime.textContent = summary.delivery; // Einfach direkt ausgeben
-      } 
-      // Wenn ein Datum angegeben wurde (z. B. 2025-11-12T17:11)
-      else if (summary.delivery) {
-        const date = new Date(summary.delivery); // ISO-String in echtes Datum umwandeln
-
-        // Datum und Uhrzeit schön auf Deutsch formatieren, z. B.:
-        // "Mittwoch, 12.11.2025, 17:11 Uhr"
-        tyTime.textContent =
-          date.toLocaleString("de-DE", {
-            weekday: "long",  // Wochentag ausschreiben
-            day: "2-digit",   // Tag zweistellig
-            month: "2-digit", // Monat zweistellig
-            year: "numeric",  // Jahr vierstellig
-            hour: "2-digit",  // Stunde zweistellig
-            minute: "2-digit" // Minute zweistellig
-          }) + " Uhr";
-      } 
-      // Wenn gar keine Information vorhanden ist
-      else {
-        tyTime.textContent = "–"; // Platzhalter
-      
+    checkoutBtn.addEventListener("click", (e) => {
+        const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
+        if (!currentCart.length) {
+            e.preventDefault();
+            alert("Ihr Warenkorb ist noch leer.");
         }
-      }
-      
-    } else {
-      // Fallback falls direkt aufgerufen ohne Bestellung
-      if (tyNet)     tyNet.textContent = "0,00 €";
-      if (tyShipping)tyShipping.textContent = "0,00 €";
-      if (tyVat)     tyVat.textContent = "0,00 €";
-      if (tyTotal)   tyTotal.textContent = "0,00 €";
-      if (tyTime)    tyTime.textContent = "–";
-    }
-  }
-
-  /* ----- 3.7 Kontaktformular: Fake-Senden mit Bestätigungsansicht ----- */
-  const contactForm = document.getElementById("contact-form");
-  if (contactForm){
-    contactForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      // Einfache Bestätigung erzeugen (keine echte Mail)
-      const wrapper = contactForm.closest(".card") || contactForm.parentElement;
-      contactForm.style.display = "none";
-      const confirm = document.createElement("div");
-      confirm.className = "contact-confirm";
-      confirm.innerHTML = `
-        <h2>Vielen Dank für Ihre Nachricht!</h2>
-        <p>Wir haben Ihre Anfrage erhalten und melden uns in Kürze bei Ihnen.</p>
-        <a href="index.html" class="btn-secondary">Zur Startseite</a>
-      `;
-      wrapper.appendChild(confirm);
     });
-  }
+}
+
+/****************************************************
+ * START
+ ****************************************************/
+window.addEventListener("DOMContentLoaded", () => {
+    loadPizzaConfig();
+    renderCartPage();
+    protectCheckoutWhenCartEmpty();
+    initCheckoutDatetimeLogic(); 
 });
 
-/* ----- Saisonale Bestseller-Pizza ----- */
-const seasonalEl = document.getElementById("seasonal-special");
-if (seasonalEl){
-  // Aktueller Monat bestimmen
-  const month = new Date().getMonth(); // 0=Jan ... 11=Dez
-  let season;
-  if (month >= 2 && month <= 4) season = "spring";   // März–Mai
-  else if (month >= 5 && month <= 7) season = "summer"; // Juni–Aug
-  else if (month >= 8 && month <= 10) season = "autumn"; // Sept–Nov
-  else season = "winter"; // Dez–Feb
+/****************************************************
+ * im Checkout-Bereich: Lieferzeitpunkt wählen, entweder ASAP oder Datum
+ ****************************************************/
+function initCheckoutDatetimeLogic() {
+    const asapCheckbox = document.getElementById("co-asap");
+    const datetimeInput = document.getElementById("co-datetime");
 
-  // Presets für jede Jahreszeit
-  // Saisonale Bestseller-Pizza Presets
-const seasonalSpecials = {
-  spring: { size: "30", dough: "italian", sauce: "tomato", cheeses: ["mozzarella"], toppings: ["basil","artichokes","mushrooms"], note: "Frühlings-Pizza: Frischer Gartenmix", qty: 1 },
-  summer: { size: "30", dough: "italian", sauce: "tomato", cheeses: ["mozzarella","goat"], toppings: ["tomatoes","zucchini","bellpeppers"], note: "Sommer-Pizza: Mediterraner Genuss", qty: 1 },
-  autumn: { size: "30", dough: "american", sauce: "bbq", cheeses: ["cheddar"], toppings: ["chicken","onion","mushrooms","peperoni"], note: "Herbst-Pizza: Herzhaft & würzig", qty: 1 },
-  winter: { size: "30", dough: "italian", sauce: "oilherbs", cheeses: ["mozzarella","goat"], toppings: ["rucola","porcini","walnuts"], note: "Winter-Pizza: Trüffel & Wintergemüse", qty: 1 }
-};
+    if (!asapCheckbox || !datetimeInput) return;
 
-  const preset = seasonalSpecials[season];
-  if (preset){
-    // Preis dynamisch berechnen
-    function calcPizzaPrice(item){
-      let unit = 0;
-      unit += CONFIG.prices.size[item.size] || 0;
-      unit += CONFIG.prices.dough[item.dough] || 0;
-      unit += CONFIG.prices.sauce[item.sauce] || 0;
-      (item.cheeses || []).forEach(c => unit += CONFIG.prices.cheese[c] || 0);
-      (item.toppings || []).forEach(t => unit += CONFIG.prices.toppings[t] || 0);
-      return applyVAT(unit); // Brutto inkl. MwSt.
+    function updateState() {
+        if (asapCheckbox.checked) {
+            datetimeInput.value = "";
+            datetimeInput.disabled = true;
+            datetimeInput.required = false;
+        } else {
+            datetimeInput.disabled = false;
+            datetimeInput.required = true;
+        }
     }
 
-    const priceStr = euro(calcPizzaPrice(preset));
-
-    // Text inkl. Preis
-    seasonalEl.textContent = `${preset.note} (${priceStr})`;
-
-    // Button wie bei Pizza des Tages
-    const link = document.createElement('a');
-    link.href = 'configurator.html';
-    link.textContent = 'Jetzt auswählen';
-    link.className = 'btn-primary';
-    link.style.marginLeft = '0.6rem';
-
-    const wrap = document.createElement('span');
-    wrap.className = 'daily-wrap';
-    wrap.appendChild(document.createTextNode(' '));
-    wrap.appendChild(link);
-    seasonalEl.appendChild(wrap);
-
-    link.addEventListener('click', (e) => {
-      e.preventDefault();
-      localStorage.setItem(CONFIG.storageKey + "_pending", JSON.stringify(preset));
-      window.location.href = link.href;
-    });
-  }
+    asapCheckbox.addEventListener("change", updateState);
+    updateState();
 }
