@@ -16,6 +16,7 @@ Object.fromEntries = l => l.reduce((a, [k,v]) => ({...a, [k]: v}), {})
 
 const helper = require('./helper.js');
 const fileHelper = require('./fileHelper.js');
+const path = require('path');              // <--- NEU
 console.log('Starting server...');
 
 try {
@@ -42,6 +43,8 @@ try {
     app.locals.dbConnection = dbConnection;
 
     console.log('Binding middleware...');
+    // Serves static files (HTML, CSS, JS, images) from the frontend directory
+    app.use(express.static(path.join(__dirname, '..', 'frontend'))); // <--- NEU
     // setting folder for static files like images, pdfs aso
     app.use(express.static(__dirname + '/public'));
     // defining file upload limit
@@ -207,4 +210,5 @@ try {
 } catch (ex) {
     console.error(ex);
 }
+
 
