@@ -505,19 +505,180 @@ function renderCartPage() {
 }
 
 /****************************************************
- * 13. Checkout-Button absichern
+ * 13. Checkout-Button absichern + Bestellung speichern
  ****************************************************/
 function protectCheckoutWhenCartEmpty() {
-    const checkoutBtn = document.querySelector(".btn-primary.fullwidth");
-    if (!checkoutBtn) return;
+  const coForm = document.getElementById("checkout-form");
+  if (!coForm) return;
 
-    checkoutBtn.addEventListener("click", (e) => {
-        const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
-        if (!currentCart.length) {
-            e.preventDefault();
-            alert("Ihr Warenkorb ist noch leer.");
-        }
+  coForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
+    if (!currentCart.length) {
+      alert("Ihr Warenkorb ist noch leer.");
+      return;
+    }
+    await sendOrderToBackend();
+  });
+}
+
+/****************************************************
+ * 14. Bestellung an das Backend senden
+ ****************************************************/
+async function sendOrderToBackend() {
+  // Warenkorb aus localStorage holen
+  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+  if (!cart.length) {
+    alert("Warenkorb ist leer – Bestellung nicht möglich.");
+    return;
+  }
+
+  // Formular-Felder einsammeln (Checkout-Seite)
+  const name   = document.getElementById("co-name")?.value.trim()   || "";
+  const street = document.getElementById("co-street")?.value.trim() || "";
+  const zip    = document.getElementById("co-zip")?.value.trim()    || "";
+  const city   = document.getElementById("co-city")?.value.trim()   || "";
+  const phone  = document.getElementById("co-phone")?.value.trim()  || "";
+  const email  = document.getElementById("co-email")?.value.trim()  || "";
+  const asap   = document.getElementById("co-asap")?.checked        || false;
+  const dtVal  = document.getElementById("co-datetime")?.value      || null;
+  const note   = document.getElementById("co-note")?.value.trim()   || "";
+
+  // Pflichtfelder prüfen
+  if (!name || !street || !zip || !city || !email) {
+    alert("Bitte alle Pflichtfelder ausfüllen (Name, Adresse, PLZ, Stadt, E-Mail).");
+    return;
+  }
+
+  // === WICHTIG: HIER EINE ECHTE PRODUKT-ID EINTRAGEN ===
+  // z.B. die ID einer speziellen "Konfigurator-Pizza"
+  // oder einer Standard-Pizza, die du dafür verwendest.
+  const KONFIG_PIZZA_PRODUKT_ID = 302; // <-- ANPASSEN!
+
+  // Zahlungsart: hier eine existierende Zahlungsart-ID aus der DB nutzen
+  const zahlungsart = { id: 1 }; // z.B. 1 = Barzahlung
+
+  // Bestellpositionen aus dem Warenkorb bauen
+  const bestellpositionen = cart.map(item => {
+    // wir nutzen Menge aus dem Warenkorb
+    return {
+      produkt: { id: KONFIG_PIZZA_PRODUKT_ID },
+      menge: item.qty
+      // einzelpreis wird im Standard-DAO nicht immer gebraucht,
+      // falls doch: hier ergänzen
+      // einzelpreis: item.total / item.qty
+    };
+  });
+
+  // Payload nach Erwartung von /api/bestellung
+  const payload = {
+    // bestellzeitpunkt weglassen -> Backend setzt helper.getNow()
+    zahlungsart,
+    bestellpositionen
+    // besteller lassen wir komplett weg -> wird im Service auf null gesetzt
+  };
+
+  console.log("Sende Bestellung an /api/bestellung:", payload);
+
+  try {
+    const response = await fetch("/api/bestellung", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
     });
+
+    const data = await response.json();
+
+    if (!response.ok || data.fehler) {
+      console.error("Fehler beim Speichern der Bestellung:", data);
+      alert("Fehler beim Speichern der Bestellung: " + (data.nachricht || "Unbekannter Fehler"));
+      return;
+    }
+
+    alert("Bestellung wurde erfolgreich gespeichert! (Bestell-ID: " + (data.id || "?") + ")");
+    // Warenkorb leeren und auf Danke-Seite leiten
+    localStorage.removeItem("cart");
+    window.location.href = "thankyou.html";
+  } catch (err) {
+    console.error("Netzwerkfehler beim Senden der Bestellung:", err);
+    alert("Netzwerkfehler beim Senden der Bestellung.");
+  }
+}
+/****************************************************
+ * 15. Checkout-Seite: Bestellung anzeigen
+ ****************************************************/
+function renderCheckoutSummary() {
+    const coList     = document.getElementById("checkout-list");
+    if (!coList) return; // wir sind nicht auf checkout.html
+
+    const coNet      = document.getElementById("checkout-net");
+    const coShipping = document.getElementById("checkout-shipping");
+    const coVAT      = document.getElementById("checkout-vat");
+    const coTotal    = document.getElementById("checkout-total");
+
+    // Warenkorb aus localStorage lesen
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+
+    coList.innerHTML = "";
+
+    if (!cart.length) {
+        // Nichts im Warenkorb -> alles auf 0 setzen
+        if (coNet)      coNet.textContent      = "0,00 €";
+        if (coShipping) coShipping.textContent = "0,00 €";
+        if (coVAT)      coVAT.textContent      = "0,00 €";
+        if (coTotal)    coTotal.textContent    = "0,00 €";
+        return;
+    }
+
+    let sumNet = 0;
+
+    cart.forEach(item => {
+        const total = item.total || 0;
+        sumNet += total;
+
+        const li = document.createElement("li");
+        li.className = "mini-cart-item";
+        li.innerHTML = `
+            <span class="small">${item.qty}× ${item.text}</span>
+            <strong>${euro(total)}</strong>
+        `;
+        coList.appendChild(li);
+    });
+
+    // Versand (bei dir aktuell 0)
+    const shippingNet = 0;
+    const vatAmount   = (sumNet + shippingNet) * 0.19;
+    const grossTotal  = sumNet + shippingNet + vatAmount;
+
+    if (coNet)      coNet.textContent      = euro(sumNet);
+    if (coShipping) coShipping.textContent = euro(shippingNet);
+    if (coVAT)      coVAT.textContent      = euro(vatAmount);
+    if (coTotal)    coTotal.textContent    = euro(grossTotal);
+}
+/****************************************************
+ * Thankyou-Seite: Bestellübersicht anzeigen
+ ****************************************************/
+function renderThankyouSummary() {
+  const netEl = document.getElementById("ty-net");
+  if (!netEl) return; // wir sind nicht auf thankyou.html
+
+  const raw = localStorage.getItem("lastOrderSummary");
+  if (!raw) return;
+
+  let summary;
+  try {
+    summary = JSON.parse(raw);
+  } catch (e) {
+    console.error("Konnte lastOrderSummary nicht parsen:", e);
+    return;
+  }
+
+  document.getElementById("ty-net").textContent      = euro(summary.net || 0);
+  document.getElementById("ty-shipping").textContent = euro(summary.shipping || 0);
+  document.getElementById("ty-vat").textContent      = euro(summary.vat || 0);
+  document.getElementById("ty-total").textContent    = euro(summary.total || 0);
+  document.getElementById("ty-time").textContent     = summary.deliveryTet || "–";
+
 }
 
 /****************************************************
@@ -528,6 +689,8 @@ window.addEventListener("DOMContentLoaded", () => {
     renderCartPage();
     protectCheckoutWhenCartEmpty();
     initCheckoutDatetimeLogic(); 
+    renderCheckoutSummary();        // Warenkorb rechts auf checkout.html anzeigen
+    renderThankyouSummary();
 });
 
 /****************************************************
@@ -539,6 +702,13 @@ function initCheckoutDatetimeLogic() {
 
     if (!asapCheckbox || !datetimeInput) return;
 
+     // Mindestdatum auf „jetzt“ setzen (kein Datum in der Vergangenheit)
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset()); // für datetime-local korrigieren
+    const minValue = now.toISOString().slice(0, 16); // "YYYY-MM-DDTHH:MM"
+    datetimeInput.min = minValue;
+
+
     function updateState() {
         if (asapCheckbox.checked) {
             datetimeInput.value = "";
@@ -549,7 +719,19 @@ function initCheckoutDatetimeLogic() {
             datetimeInput.required = true;
         }
     }
+     // Wenn der Nutzer ein Datum auswählt, automatisch ASAP deaktivieren
+    datetimeInput.addEventListener("input", () => {
+        if (datetimeInput.value) {
+            asapCheckbox.checked = false;
+            updateState();
+        }
+    });
 
+    // Änderungen an der Checkbox behandeln
     asapCheckbox.addEventListener("change", updateState);
+
+    // Standard: „Schnellstmöglich“ aktiv
+    asapCheckbox.checked = true;
     updateState();
+
 }
