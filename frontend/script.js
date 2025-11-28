@@ -581,11 +581,12 @@ async function sendOrderToBackend() {
   console.log("Sende Bestellung an /api/bestellung:", payload);
 
   try {
-    const response = await fetch("/api/bestellung", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const response = await fetch("http://127.0.0.1:8000/api/bestellung", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload)
+});
+
 
     const data = await response.json();
 
