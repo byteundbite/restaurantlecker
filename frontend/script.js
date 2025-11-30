@@ -43,6 +43,47 @@ async function loadPizzaConfig() {
     }
 }
 
+// Kontaktformular: Submit an Backend schicken
+function initContactForm() {
+    const form = document.getElementById('contact-form');
+    if (!form) return;
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const name = document.getElementById('c-name')?.value.trim() || '';
+        const phone = document.getElementById('c-phone')?.value.trim() || '';
+        const email = document.getElementById('c-email')?.value.trim() || '';
+        const message = document.getElementById('c-msg')?.value.trim() || '';
+
+        if (!name || !email || !message) {
+            alert('Bitte Name, E-Mail und Nachricht ausfüllen.');
+            return;
+        }
+
+        try {
+            const res = await fetch('http://127.0.0.1:8000/api/contact', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone, email, message })
+            });
+
+            const data = await res.json();
+            if (!res.ok || data.fehler) {
+                console.error('Fehler beim Senden des Kontaktformulars:', data);
+                alert('Fehler beim Senden des Formulars: ' + (data.nachricht || 'Unbekannter Fehler'));
+                return;
+            }
+
+            alert('Vielen Dank! Ihre Nachricht wurde gesendet.');
+            form.reset();
+        } catch (err) {
+            console.error('Netzwerkfehler beim Senden des Kontaktformulars:', err);
+            alert('Netzwerkfehler beim Senden des Formulars.');
+        }
+    });
+}
+
 /****************************************************
  * Hilfsfunktion: Prüfen ob Konfigurator geladen werden soll
  ****************************************************/
@@ -692,6 +733,7 @@ window.addEventListener("DOMContentLoaded", () => {
     initCheckoutDatetimeLogic(); 
     renderCheckoutSummary();        // Warenkorb rechts auf checkout.html anzeigen
     renderThankyouSummary();
+    initContactForm();
 });
 
 /****************************************************

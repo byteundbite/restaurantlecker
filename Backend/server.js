@@ -1,4 +1,4 @@
-/////////////////
+    /////////////////
 // WebAnwendungen 2 Project
 // Backend
 // Main Server / Controller
@@ -26,6 +26,23 @@ try {
     const dbOptions = { verbose: console.log };
     const dbFile = './db/webanw2.sqlite';
     const dbConnection = new Database(dbFile, dbOptions);
+
+    // Ensure Kontakt table exists for contact form submissions
+    try {
+        dbConnection.prepare(
+            `CREATE TABLE IF NOT EXISTS Kontakt (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT,
+                telefon TEXT,
+                email TEXT,
+                nachricht TEXT,
+                erstellzeitpunkt TEXT
+            )`
+        ).run();
+        console.log('Checked/created table Kontakt');
+    } catch (ex) {
+        console.error('Could not create or check Kontakt table: ' + ex.message);
+    }
 
     // create server
     const HTTP_PORT = 8000;
@@ -75,6 +92,9 @@ try {
     console.log('Binding enpoints, top level Path at ' + TOPLEVELPATH);
     
     var serviceRouter = require('./services/land.js');
+    app.use(TOPLEVELPATH, serviceRouter);
+
+    serviceRouter = require('./services/contact.js');
     app.use(TOPLEVELPATH, serviceRouter);
 
     serviceRouter = require('./services/adresse.js');
