@@ -1,7 +1,7 @@
 # Byte&Bite — restaurantlecker
 
 Dieses README fasst die Projektstruktur zusammen und beschreibt welche Frontend-Seiten an welche Backend-Services angebunden.
-
+GitHub Repo: 'https://github.com/byteundbite/restaurantlecker'
 ---
 
 ## Schnellstart
