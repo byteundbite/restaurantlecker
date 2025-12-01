@@ -280,3 +280,42 @@ textarea{ resize: vertical; }
 @media (max-width: 900px){
     .grid-2.cart-layout{ grid-template-columns: 1fr; }
 }
+.qty-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.qty-btn {
+    background: #f2f2f2;
+    border: none;
+    width: 28px;
+    height: 28px;
+    font-size: 18px;
+    line-height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.cart-qty {
+    width: 40px;
+    text-align: center;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 2px;
+}
+/* Spaltenbreite stabilisieren */
+.cart-table td:nth-child(2),
+.cart-table th:nth-child(2) {
+    width: 120px;        /* Menge-Spalte immer gleich breit */
+    text-align: center;
+}
+
+.cart-table td:nth-child(3),
+.cart-table th:nth-child(3) {
+    width: 100px;        /* Preis-Spalte fixieren */
+    padding-right: 25px;       
+
+    text-align: right;
+}
+
