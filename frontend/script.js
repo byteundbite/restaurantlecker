@@ -520,30 +520,78 @@ function renderCartPage() {
         net += item.total;
 
         const tr = document.createElement("tr");
+
         tr.innerHTML = `
             <td>${item.text}</td>
-            <td>${item.qty}</td>
+
+            <td>
+                <div class="qty-wrapper">
+                    <button class="qty-btn" data-action="minus" data-index="${index}">−</button>
+                    <input class="cart-qty" value="${item.qty}" readonly />
+                    <button class="qty-btn" data-action="plus" data-index="${index}">+</button>
+                </div>
+            </td>
+
             <td>${euro(item.total)}</td>
-            <td><button class="btn-secondary" data-i="${index}">X</button></td>
+
+            <td>
+                <button class="btn-secondary remove-btn" data-index="${index}">X</button>
+            </td>
         `;
+
         cartBody.appendChild(tr);
     });
 
-    document.getElementById("cart-net").textContent = euro(net);
-    document.getElementById("cart-shipping").textContent = euro(0);
-    document.getElementById("cart-subtotal").textContent = euro(net);
-    document.getElementById("cart-vat").textContent = euro(net * 0.19);
-    document.getElementById("cart-total").textContent = euro(net * 1.19);
+    // --- Buttons aktivieren ---
+    attachCartQtyListeners();
 
-    document.querySelectorAll("[data-i]").forEach(btn =>
-        btn.addEventListener("click", e => {
-            const idx = e.target.dataset.i;
-            CART.splice(idx, 1);
+    // --- Totals aktualisieren ---
+    const shipping = 2.00;
+    const subtotal = net + shipping;
+    const vat = subtotal * 0.19;
+    const total = subtotal + vat;
+    
+    document.getElementById("cart-net").textContent = euro(net);
+    document.getElementById("cart-shipping").textContent = euro(shipping);
+    document.getElementById("cart-subtotal").textContent = euro(subtotal);
+    document.getElementById("cart-vat").textContent = euro(vat);
+    document.getElementById("cart-total").textContent = euro(total);
+}
+function attachCartQtyListeners() {
+    document.querySelectorAll(".qty-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const index = btn.dataset.index;
+            const action = btn.dataset.action;
+
+            // Stückpreis aus aktuellem Zustand berechnen
+            const item = CART[index];
+            const unitPrice = item.total / item.qty;  // brutto pro Pizza
+
+            if (action === "minus" && item.qty > 1) {
+                item.qty--;
+            }
+            if (action === "plus") {
+                item.qty++;
+            }
+
+            // neuen Gesamtpreis aus Stückpreis * Menge berechnen
+            item.total = unitPrice * item.qty;
+
             saveCart();
             renderCartPage();
-        })
-    );
+        });
+    });
+
+    document.querySelectorAll(".remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const index = btn.dataset.index;
+            CART.splice(index, 1);
+            saveCart();
+            renderCartPage();
+        });
+    });
 }
+
 
 /****************************************************
  * 13. Checkout-Button absichern + Bestellung speichern
@@ -621,6 +669,38 @@ async function sendOrderToBackend() {
 
   console.log("Sende Bestellung an /api/bestellung:", payload);
 
+  // === Zusammenfassung für Thankyou-Seite vorbereiten ===
+  let sumNet = 0;
+  cart.forEach(item => {
+    sumNet += item.total || 0;
+  });
+
+  const shippingNet = 2.00;
+  const vatAmount   = (sumNet + shippingNet) * 0.19;
+  const grossTotal  = sumNet + shippingNet + vatAmount;
+
+  const deliveryText = asap
+    ? "Schnellstmögliche Lieferung"
+    : (dtVal ? new Date(dtVal).toLocaleString("de-DE") : "–");
+
+  const lastOrderSummary = {
+    kunde: {
+      name,
+      street,
+      zip,
+      city,
+      phone,
+      email
+    },
+    items: cart,
+    net: sumNet,
+    shipping: shippingNet,
+    vat: vatAmount,
+    total: grossTotal,
+    deliveryText,
+    note
+  };
+
   try {
     const response = await fetch("http://127.0.0.1:8000/api/bestellung", {
   method: "POST",
@@ -637,6 +717,10 @@ async function sendOrderToBackend() {
       return;
     }
 
+    // *** HIER: Summary im localStorage ablegen ***
+    localStorage.setItem("lastOrderSummary", JSON.stringify(lastOrderSummary));
+
+
     alert("Bestellung wurde erfolgreich gespeichert! (Bestell-ID: " + (data.id || "?") + ")");
     // Warenkorb leeren und auf Danke-Seite leiten
     localStorage.removeItem("cart");
@@ -646,6 +730,8 @@ async function sendOrderToBackend() {
     alert("Netzwerkfehler beim Senden der Bestellung.");
   }
 }
+
+
 /****************************************************
  * 15. Checkout-Seite: Bestellung anzeigen
  ****************************************************/
@@ -664,7 +750,6 @@ function renderCheckoutSummary() {
     coList.innerHTML = "";
 
     if (!cart.length) {
-        // Nichts im Warenkorb -> alles auf 0 setzen
         if (coNet)      coNet.textContent      = "0,00 €";
         if (coShipping) coShipping.textContent = "0,00 €";
         if (coVAT)      coVAT.textContent      = "0,00 €";
@@ -687,16 +772,18 @@ function renderCheckoutSummary() {
         coList.appendChild(li);
     });
 
-    // Versand (bei dir aktuell 0)
-    const shippingNet = 0;
-    const vatAmount   = (sumNet + shippingNet) * 0.19;
-    const grossTotal  = sumNet + shippingNet + vatAmount;
+    // --- Totals aktualisieren (Lieferung 3 €) ---
+    const shipping = 2.00;
+    const vatBase  = sumNet + shipping;
+    const vat      = vatBase * 0.19;
+    const total    = vatBase + vat;
 
     if (coNet)      coNet.textContent      = euro(sumNet);
-    if (coShipping) coShipping.textContent = euro(shippingNet);
-    if (coVAT)      coVAT.textContent      = euro(vatAmount);
-    if (coTotal)    coTotal.textContent    = euro(grossTotal);
+    if (coShipping) coShipping.textContent = euro(shipping);
+    if (coVAT)      coVAT.textContent      = euro(vat);
+    if (coTotal)    coTotal.textContent    = euro(total);
 }
+
 /****************************************************
  * Thankyou-Seite: Bestellübersicht anzeigen
  ****************************************************/
@@ -705,7 +792,10 @@ function renderThankyouSummary() {
   if (!netEl) return; // wir sind nicht auf thankyou.html
 
   const raw = localStorage.getItem("lastOrderSummary");
-  if (!raw) return;
+  if (!raw) {
+    console.warn("Keine lastOrderSummary im localStorage gefunden.");
+    return;
+  }
 
   let summary;
   try {
@@ -715,13 +805,42 @@ function renderThankyouSummary() {
     return;
   }
 
-  document.getElementById("ty-net").textContent      = euro(summary.net || 0);
-  document.getElementById("ty-shipping").textContent = euro(summary.shipping || 0);
-  document.getElementById("ty-vat").textContent      = euro(summary.vat || 0);
-  document.getElementById("ty-total").textContent    = euro(summary.total || 0);
-  document.getElementById("ty-time").textContent     = summary.deliveryTet || "–";
+  // Kundendaten
+  const kunde = summary.kunde || {};
+  (document.getElementById("ty-name")    || {}).textContent   = kunde.name   || "–";
+  (document.getElementById("ty-street")  || {}).textContent   = kunde.street || "–";
+  (document.getElementById("ty-zipcity") || {}).textContent   =
+    (kunde.zip || "–") + " " + (kunde.city || "");
+  (document.getElementById("ty-email")   || {}).textContent   = kunde.email  || "–";
+  (document.getElementById("ty-phone")   || {}).textContent   = kunde.phone  || "–";
 
+  // Bestellte Artikel
+  const itemsEl = document.getElementById("ty-items");
+  if (itemsEl) {
+    itemsEl.innerHTML = "";
+    (summary.items || []).forEach(item => {
+      const li = document.createElement("li");
+      li.className = "mini-cart-item";
+      li.innerHTML = `
+        <span class="small">${item.qty}× ${item.text}</span>
+        <strong>${euro(item.total || 0)}</strong>
+      `;
+      itemsEl.appendChild(li);
+    });
+  }
+
+  // Preise
+  document.getElementById("ty-net").textContent      = euro(summary.net      || 0);
+  document.getElementById("ty-shipping").textContent = euro(summary.shipping || 0);
+  document.getElementById("ty-vat").textContent      = euro(summary.vat      || 0);
+  document.getElementById("ty-total").textContent    = euro(summary.total    || 0);
+
+  // Liefertermin
+  document.getElementById("ty-time").textContent     = summary.deliveryText || "–";
 }
+
+
+
 
 /****************************************************
  * START
