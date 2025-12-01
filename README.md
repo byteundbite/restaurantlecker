@@ -1,7 +1,9 @@
-# Byte&Bite — restaurantlecker
+# Byte&Bite "Restaurant Lecker" - Pizzakonfigurator
 
-Dieses README fasst die Projektstruktur zusammen und beschreibt welche Frontend-Seiten an welche Backend-Services angebunden.
-GitHub Repo: 'https://github.com/byteundbite/restaurantlecker'
+## Inhalt
+- Schnellstart Anleitung und wichtigste Pfade/Dateien
+- Bisherige Backend-Anbindung
+
 ---
 
 ## Schnellstart
@@ -9,7 +11,7 @@ GitHub Repo: 'https://github.com/byteundbite/restaurantlecker'
 - Voraussetzungen: `node` (empfohlen Node 22.3.0), `npm`
 - Backend starten:
 
-```powershell
+```bash
 cd .\restaurantlecker\Backend
 npm install
 npm start
@@ -17,11 +19,11 @@ npm start
 
 - Entwicklung mit `nodemon`:
 
-```powershell
+```bash
 npm run dev
 ```
 
-Frontend ist statisch und wird vom Express-Server unter `http://127.0.0.1:8000/` bereitgestellt.
+Startseite aufrufen mit `localhost:8000`
 
 ---
 
@@ -72,13 +74,14 @@ Die wichtigsten Verbindungen (Frontend → Backend):
   - Übertragene Felder: `name` (`#c-name`), `phone` (`#c-phone`), `email` (`#c-email`), `message` (`#c-msg`).
   - Backend schreibt Einträge in die DB-Tabelle `Kontakt`.
 
-- `cart.html`
-  - Nur Frontend/UI; zeigt LocalStorage Warenkorb; keine direkte API-Interaktion.
-
 - `checkout.html`
   - Formular `#checkout-form` wird clientseitig geprüft und dann `POST /api/bestellung` aufgerufen (Payload wird in `frontend/script.js` erzeugt und enthält `bestellpositionen` aus LocalStorage sowie `zahlungsart`, optional `besteller`-Daten).
 
-- `thankyou.html`, `about.html`, `legal.html`
+---
+
+## Noch-nicht angebundene Frontend-Seiten
+
+- `cart.html`, `thankyou.html`, `about.html`, `legal.html`
   - Statisch / nur UI; `script.js` wird geladen, aber es gibt keine zusätzlichen API-POSTs auf diesen Seiten.
 
 ---
@@ -94,45 +97,3 @@ Die wichtigsten Verbindungen (Frontend → Backend):
 
 Hinweis: Die Services sind unter `/api/<servicename>/...` erreichbar; die Implementierung (Methoden/URLs) steht in den jeweiligen Dateien unter `Backend/services/`.
 
----
-
-## Tabelle `Kontakt` (DB)
-
-Wird beim Serverstart geprüft/erstellt (siehe `server.js`). Schema (vereinfacht):
-
-- `id` INTEGER PRIMARY KEY AUTOINCREMENT
-- `name` TEXT
-- `telefon` TEXT
-- `email` TEXT
-- `nachricht` TEXT
-- `erstellzeitpunkt` TEXT (SQL-Datetime-String)
-
-Die DAO `Backend/dao/contactDao.js` bietet eine `create(...)`-Methode zum Einfügen.
-
----
-
-## Beispielanfragen / Tests
-
-- Kontakt absenden (PowerShell):
-
-```powershell
-Invoke-RestMethod -Uri 'http://127.0.0.1:8000/api/contact' -Method POST -ContentType 'application/json' -Body (@{name='Max Mustermann'; phone='+49 123'; email='max@example.com'; message='Testnachricht'} | ConvertTo-Json)
-```
-
-- Kontakt absenden (curl):
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/contact -H "Content-Type: application/json" -d '{"name":"Max","phone":"123","email":"max@example.com","message":"Test"}'
-```
-
-- Pizza-Konfiguration laden:
-
-```bash
-curl http://127.0.0.1:8000/api/pizzaconfig/load
-```
-
-- Bestellung anlegen (Beispiel-Payload):
-
-```bash
-curl -X POST http://127.0.0.1:8000/api/bestellung -H "Content-Type: application/json" -d '{"zahlungsart":{"id":1},"bestellpositionen":[{"produkt":{"id":302},"menge":1}] }'
-```
