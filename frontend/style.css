@@ -319,3 +319,62 @@ textarea{ resize: vertical; }
     text-align: right;
 }
 
+/* ========== Email-Validierungs-Feedback ========== */
+.email-feedback {
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius);
+    display: none;
+    animation: slideDown 0.2s ease-out;
+}
+
+.email-feedback.success {
+    display: block;
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.email-feedback.error {
+    display: block;
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* ========== Telefon-Validierungs-Feedback ========== */
+.phone-feedback {
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+    padding: 0.5rem 0.6rem;
+    border-radius: var(--radius);
+    display: none;
+    animation: slideDown 0.2s ease-out;
+}
+
+.phone-feedback.success {
+    display: block;
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.phone-feedback.error {
+    display: block;
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
