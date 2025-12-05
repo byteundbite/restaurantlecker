@@ -48,6 +48,147 @@ function initContactForm() {
     const form = document.getElementById('contact-form');
     if (!form) return;
 
+    // Email-Validierung mit Echtzeit-Feedback
+    const emailInput = document.getElementById('c-email');
+    const emailFeedback = document.getElementById('email-feedback');
+
+    // Telefon-Validierung mit Echtzeit-Feedback
+    const phoneInput = document.getElementById('c-phone');
+    const phoneFeedback = document.getElementById('phone-feedback');
+
+    if (phoneInput && phoneFeedback) {
+        // Regex-Patterns für deutsche Telefonnummern
+        // Mobil: +49 (0)1xx xxx xxx oder 01xx xxx xxx
+        // Festnetz: +49 (0)xxx xxx xxxx oder 0xxx xxx xxxx
+        const mobileRegex = /^(\+49|0049|0)?\s*1[0-9]{1,3}\s*[0-9\s\-\/]{6,}$/;
+        const landlineRegex = /^(\+49|0049|0)?\s*[2-9][0-9]{1,4}\s*[0-9\s\-\/]{6,}$/;
+
+        phoneInput.addEventListener('input', () => {
+            const phone = phoneInput.value.trim();
+            phoneFeedback.className = 'phone-feedback';
+            phoneFeedback.textContent = '';
+
+            if (phone.length === 0) {
+                return; // Leer = kein Feedback nötig
+            }
+
+            // Entfernt Leerzeichen für Längsprüfung
+            const phoneDigits = phone.replace(/\s/g, '');
+
+            if (!/^[0-9+\-\s\/()]+$/.test(phone)) {
+                phoneFeedback.className = 'phone-feedback error';
+                phoneFeedback.textContent = '✘ Telefonnummer darf nur Zahlen, +, -, Leerzeichen und () enthalten';
+                return;
+            }
+
+            if (phoneDigits.length < 10) {
+                phoneFeedback.className = 'phone-feedback error';
+                phoneFeedback.textContent = '✘ Telefonnummer zu kurz (mindestens 10 Ziffern)';
+                return;
+            }
+
+            if (phoneDigits.length > 20) {
+                phoneFeedback.className = 'phone-feedback error';
+                phoneFeedback.textContent = '✘ Telefonnummer zu lang (maximal 20 Ziffern)';
+                return;
+            }
+
+            // Prüfe ob es eine Mobilnummer ist
+            if (mobileRegex.test(phone)) {
+                phoneFeedback.className = 'phone-feedback success';
+                phoneFeedback.textContent = '✓ Gültige Mobilnummer erkannt';
+                return;
+            }
+
+            // Prüfe ob es eine Festnetznummer ist
+            if (landlineRegex.test(phone)) {
+                phoneFeedback.className = 'phone-feedback success';
+                phoneFeedback.textContent = '✓ Gültige Festnetznummer erkannt';
+                return;
+            }
+
+            // Wenn mindestens 10 Ziffern und grundlegendes Format okay
+            if (/^[+0-9\s\-()]+$/.test(phone) && phoneDigits.length >= 10) {
+                phoneFeedback.className = 'phone-feedback success';
+                phoneFeedback.textContent = '✓ Telefonnummer ist gültig';
+            } else {
+                phoneFeedback.className = 'phone-feedback error';
+                phoneFeedback.textContent = '✘ Telefonnummer-Format ist ungültig';
+            }
+        });
+
+        phoneInput.addEventListener('blur', () => {
+            if (phoneInput.value.trim().length === 0) {
+                phoneFeedback.className = 'phone-feedback';
+                phoneFeedback.textContent = '';
+            }
+        });
+    }
+
+    if (emailInput && emailFeedback) {
+        const emailRegex = /^[a-zA-Z0-9._%-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+        emailInput.addEventListener('input', () => {
+            const email = emailInput.value.trim();
+            emailFeedback.className = 'email-feedback';
+            emailFeedback.textContent = '';
+
+            if (email.length === 0) {
+                return; // Leer = kein Feedback nötig
+            }
+
+            if (!email.includes('@')) {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ E-Mail-Adresse muss ein @ enthalten';
+                return;
+            }
+
+            const [localPart, domain] = email.split('@');
+
+            if (!localPart || localPart.length === 0) {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ Benutzername vor @ fehlt';
+                return;
+            }
+
+            if (!domain || domain.length === 0) {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ Domain nach @ fehlt';
+                return;
+            }
+
+            if (!domain.includes('.')) {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ Domain muss einen Punkt enthalten (z.B. example.com)';
+                return;
+            }
+
+            const domainParts = domain.split('.');
+            const tld = domainParts[domainParts.length - 1];
+
+            if (tld.length < 2) {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ TLD (wie .com, .de) muss mindestens 2 Zeichen lang sein';
+                return;
+            }
+
+            if (emailRegex.test(email)) {
+                emailFeedback.className = 'email-feedback success';
+                emailFeedback.textContent = '✓ E-Mail-Adresse ist gültig';
+            } else {
+                emailFeedback.className = 'email-feedback error';
+                emailFeedback.textContent = '✘ E-Mail-Format ist ungültig';
+            }
+        });
+
+        emailInput.addEventListener('blur', () => {
+            if (emailInput.value.trim().length === 0) {
+                emailFeedback.className = 'email-feedback';
+                emailFeedback.textContent = '';
+            }
+        });
+    }
+
     form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
