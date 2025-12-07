@@ -3,9 +3,9 @@
  * Backend-API: /api/pizzaconfig/load
  ****************************************************/
 
-console.log("Dynamic Pizza Configurator loaded.");
+// console.log("Dynamic Pizza Configurator loaded.");
 
-const API_URL = "http://localhost:8000/api/pizzaconfig/load";
+// const API_URL = "http://localhost:8000/api/pizzaconfig/load";
 
 let PIZZA_DATA = null;
 let STATE = {};
@@ -27,7 +27,7 @@ async function loadPizzaConfig() {
         // Nur laden, wenn es die jeweiligen Bereiche gibt
         if (isConfiguratorPage()) {
             buildConfiguratorUI();
-            applyPresetIfExists();
+            await applyPresetIfExists();
             attachEventHandlers();
             updatePriceUI();
         }
@@ -202,8 +202,13 @@ function initContactForm() {
             return;
         }
 
+        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
+            ? window.location.origin
+            : 'http://localhost:8000';
+        const kontaktApiUrl = `${baseUrl}/api/kontakt`;
+
         try {
-            const res = await fetch('http://127.0.0.1:8000/api/contact', {
+            const res = await fetch(kontaktApiUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, phone, email, message })
@@ -247,33 +252,43 @@ function getAllProducts() {
     ];
 }
 
-function getDailyPizzaFromDB() {
-    if (!PIZZA_DATA?.produkt) return null;
-
-    const weekly = PIZZA_DATA.produkt.filter(p => p.kategorieId == 16);
-    if (weekly.length === 0) return null;
-
-    const weekday = new Date().getDay(); // 0=So ... 6=Sa
-    const sorted = weekly.sort((a, b) => a.id - b.id);
-
-    return sorted[weekday] || sorted[0];
+async function getDailyPizzaFromDB() {
+    try {
+        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
+            ? window.location.origin
+            : 'http://localhost:8000';
+        const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
+        const today = days[new Date().getDay()];
+        const res = await fetch(`${baseUrl}/api/tagespizza/tag/${today}`);
+        const data = await res.json();
+        if (res.ok && !data.fehler) {
+            return data;
+        }
+    } catch (err) {
+        console.error('Fehler beim Laden der TagesPizza:', err);
+    }
+    return null;
 }
 
-function getSeasonPizzaFromDB() {
-    if (!PIZZA_DATA?.produkt) return null;
-
-    const seasonal = PIZZA_DATA.produkt.filter(p => p.kategorieId == 17);
-    if (seasonal.length === 0) return null;
-
-    const month = new Date().getMonth();
-    let season = "Frühling";
-
-    if (month >= 2 && month <= 4) season = "Frühling";
-    else if (month >= 5 && month <= 7) season = "Sommer";
-    else if (month >= 8 && month <= 10) season = "Herbst";
-    else season = "Winter";
-
-    return seasonal.find(p => p.bezeichnung.startsWith(season)) || seasonal[0];
+async function getSeasonPizzaFromDB() {
+    try {
+        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
+            ? window.location.origin
+            : 'http://localhost:8000';
+        const month = new Date().getMonth();
+        let season = "Winter";
+        if (month >= 2 && month <= 4) season = "Frühling";
+        else if (month >= 5 && month <= 7) season = "Sommer";
+        else if (month >= 8 && month <= 10) season = "Herbst";
+        const res = await fetch(`${baseUrl}/api/saisonpizza/saison/${season}`);
+        const data = await res.json();
+        if (res.ok && !data.fehler) {
+            return data;
+        }
+    } catch (err) {
+        console.error('Fehler beim Laden der SaisonPizza:', err);
+    }
+    return null;
 }
 
 /****************************************************
@@ -360,7 +375,7 @@ function buildConfiguratorUI() {
 /****************************************************
  * 5. Preset im Konfigurator anwenden
  ****************************************************/
-function applyPresetIfExists() {
+async function applyPresetIfExists() {
     if (!isConfiguratorPage()) return;
 
     const params = new URLSearchParams(window.location.search);
@@ -369,10 +384,10 @@ function applyPresetIfExists() {
     let product = null;
 
     if (params.get("preset") === "daily")
-        product = getDailyPizzaFromDB();
+        product = await getDailyPizzaFromDB();
 
     if (params.get("preset") === "season")
-        product = getSeasonPizzaFromDB();
+        product = await getSeasonPizzaFromDB();
 
     if (!product) return;
 
@@ -402,38 +417,44 @@ function euro(v) {
 
 function renderDailyPizzaOnIndex() {
     const el = document.getElementById("daily-special");
-    if (!el || !PIZZA_DATA?.produkt) return;
+    if (!el) return;
 
-    const p = getDailyPizzaFromDB();
-    if (!p) {
-        el.textContent = "Keine Pizza des Tages gefunden.";
-        return;
+    async function load() {
+        const p = await getDailyPizzaFromDB();
+        if (!p) {
+            el.textContent = "Keine Pizza des Tages gefunden.";
+            return;
+        }
+
+        el.innerHTML = `
+            <strong>${p.bezeichnung}</strong><br>
+            ${p.beschreibung}<br>
+            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong><br>
+            <a href="configurator.html?preset=daily">Jetzt konfigurieren →</a>
+        `;
     }
-
-    el.innerHTML = `
-        <strong>${p.bezeichnung}</strong><br>
-        ${p.beschreibung}<br>
-        Preis: <strong>${euro(p.nettopreis * 1.19)}</strong><br>
-        <a href="configurator.html?preset=daily">Jetzt konfigurieren →</a>
-    `;
+    load();
 }
 
 function renderSeasonPizzaOnIndex() {
     const el = document.getElementById("seasonal-special");
-    if (!el || !PIZZA_DATA?.produkt) return;
+    if (!el) return;
 
-    const p = getSeasonPizzaFromDB();
-    if (!p) {
-        el.textContent = "Keine Saisonpizza gefunden.";
-        return;
+    async function load() {
+        const p = await getSeasonPizzaFromDB();
+        if (!p) {
+            el.textContent = "Keine Saisonpizza gefunden.";
+            return;
+        }
+
+        el.innerHTML = `
+            <strong>${p.bezeichnung}</strong><br>
+            ${p.beschreibung}<br>
+            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong><br>
+            <a href="configurator.html?preset=season">Jetzt konfigurieren →</a>
+        `;
     }
-
-    el.innerHTML = `
-        <strong>${p.bezeichnung}</strong><br>
-        ${p.beschreibung}<br>
-        Preis: <strong>${euro(p.nettopreis * 1.19)}</strong><br>
-        <a href="configurator.html?preset=season">Jetzt konfigurieren →</a>
-    `;
+    load();
 }
 
 /****************************************************

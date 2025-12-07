@@ -15,8 +15,7 @@ Object.fromEntries = l => l.reduce((a, [k,v]) => ({...a, [k]: v}), {})
 /////////////////
 
 const helper = require('./helper.js');
-const fileHelper = require('./fileHelper.js');
-const path = require('path');              // <--- NEU
+const path = require('path');
 console.log('Starting server...');
 
 try {
@@ -24,25 +23,8 @@ try {
     console.log('Connect database...');
     const Database = require('better-sqlite3');
     const dbOptions = { verbose: console.log };
-    const dbFile = './db/webanw2.sqlite';
+    const dbFile = './db/byteundbite.sqlite';
     const dbConnection = new Database(dbFile, dbOptions);
-
-    // Ensure Kontakt table exists for contact form submissions
-    try {
-        dbConnection.prepare(
-            `CREATE TABLE IF NOT EXISTS Kontakt (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT,
-                telefon TEXT,
-                email TEXT,
-                nachricht TEXT,
-                erstellzeitpunkt TEXT
-            )`
-        ).run();
-        console.log('Checked/created table Kontakt');
-    } catch (ex) {
-        console.error('Could not create or check Kontakt table: ' + ex.message);
-    }
 
     // create server
     const HTTP_PORT = 8000;
@@ -84,129 +66,17 @@ try {
     app.use(morgan('dev'));
 
     // binding endpoints
-
-    app.use("/api", require("./services/pizzaconfig.js")); // Pizza Konfig hinzugefügt
-
-
     const TOPLEVELPATH = '/api';
     console.log('Binding enpoints, top level Path at ' + TOPLEVELPATH);
     
-    var serviceRouter = require('./services/land.js');
+    var serviceRouter = require('./services/kontakt.js');
     app.use(TOPLEVELPATH, serviceRouter);
 
-    serviceRouter = require('./services/contact.js');
+    serviceRouter = require('./services/tagespizza.js');
     app.use(TOPLEVELPATH, serviceRouter);
 
-    serviceRouter = require('./services/adresse.js');
+    serviceRouter = require('./services/saisonpizza.js');
     app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/person.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    
-    
-    serviceRouter = require('./services/branche.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/firma.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    
-    serviceRouter = require('./services/download.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-
-    serviceRouter = require('./services/termin.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    
-    
-    serviceRouter = require('./services/produktkategorie.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/zahlungsart.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/mehrwertsteuer.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/produktbild.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/produkt.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    serviceRouter = require('./services/bestellung.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    serviceRouter = require('./services/speisenart.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/einheit.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/zutat.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/bewertung.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/gericht.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-
-    serviceRouter = require('./services/benutzerrolle.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/forumsbenutzer.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/forumsbereich.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-
-    serviceRouter = require('./services/filmgenre.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/kinosaal.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/reservierer.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/film.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/reservierung.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-    
-    serviceRouter = require('./services/vorstellung.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    serviceRouter = require('./services/benutzer.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/token.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    serviceRouter = require('./services/galerie.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-
-    serviceRouter = require('./services/dateiuploadeinzeln.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
-    serviceRouter = require('./services/dateiuploadmehrere.js');
-    app.use(TOPLEVELPATH, serviceRouter);
-
 
     
     // send default error message if no matching endpoint found
