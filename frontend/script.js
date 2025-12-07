@@ -1,46 +1,18 @@
 /****************************************************
- * Dynamischer Pizza-Konfigurator – Byte & Bite
- * Backend-API: /api/pizzaconfig/load
+ * Restaurant Lecker - Frontend JavaScript
+ * Warenkorb und Bestellfunktionen
  ****************************************************/
 
-// console.log("Dynamic Pizza Configurator loaded.");
-
-// const API_URL = "http://localhost:8000/api/pizzaconfig/load";
-
-let PIZZA_DATA = null;
 let STATE = {};
 let CART = [];
 
 /****************************************************
- * 1. Daten vom Backend laden
+ * 1. Initialisierung
  ****************************************************/
-async function loadPizzaConfig() {
-    try {
-        const res = await fetch(API_URL);
-        const data = await res.json();
-
-        if (!data.erfolg) throw new Error("Backend meldet Fehler");
-
-        PIZZA_DATA = data.daten;
-        console.log("Pizza-Konfiguration geladen:", PIZZA_DATA);
-
-        // Nur laden, wenn es die jeweiligen Bereiche gibt
-        if (isConfiguratorPage()) {
-            buildConfiguratorUI();
-            await applyPresetIfExists();
-            attachEventHandlers();
-            updatePriceUI();
-        }
-
-        loadCartFromStorage();
-
-        // Wird immer ausgeführt – aber nur, wenn auf der index.html Elemente vorhanden sind
-        renderDailyPizzaOnIndex();
-        renderSeasonPizzaOnIndex();
-
-    } catch (err) {
-        console.error("Fehler beim Laden der Konfiguration:", err);
-    }
+function initApp() {
+    loadCartFromStorage();
+    renderDailyPizzaOnIndex();
+    renderSeasonPizzaOnIndex();
 }
 
 // Kontaktformular: Submit an Backend schicken
@@ -202,10 +174,7 @@ function initContactForm() {
             return;
         }
 
-        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
-            ? window.location.origin
-            : 'http://localhost:8000';
-        const kontaktApiUrl = `${baseUrl}/api/kontakt`;
+        const kontaktApiUrl = 'http://localhost:8000/api/kontakt';
 
         try {
             const res = await fetch(kontaktApiUrl, {
@@ -231,35 +200,15 @@ function initContactForm() {
 }
 
 /****************************************************
- * Hilfsfunktion: Prüfen ob Konfigurator geladen werden soll
- ****************************************************/
-function isConfiguratorPage() {
-    return document.getElementById("size") !== null;
-}
-//neu
-/****************************************************
  * 2. DB-Daten zu Tages- & Saisonpizza
  ****************************************************/
-function getAllProducts() {
-    if (!PIZZA_DATA) return [];
-    return [
-        ...PIZZA_DATA.groesse,
-        ...PIZZA_DATA.teig,
-        ...PIZZA_DATA.sosse,
-        ...PIZZA_DATA.kaese,
-        ...PIZZA_DATA.belag,
-        ...(PIZZA_DATA.produkt || [])
-    ];
-}
+const API_BASE = 'http://localhost:8000';
 
 async function getDailyPizzaFromDB() {
     try {
-        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
-            ? window.location.origin
-            : 'http://localhost:8000';
         const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
         const today = days[new Date().getDay()];
-        const res = await fetch(`${baseUrl}/api/tagespizza/tag/${today}`);
+        const res = await fetch(`${API_BASE}/api/tagespizza/tag/${today}`);
         const data = await res.json();
         if (res.ok && !data.fehler) {
             return data;
@@ -272,15 +221,12 @@ async function getDailyPizzaFromDB() {
 
 async function getSeasonPizzaFromDB() {
     try {
-        const baseUrl = (window.location.origin && window.location.origin.startsWith('http'))
-            ? window.location.origin
-            : 'http://localhost:8000';
         const month = new Date().getMonth();
         let season = "Winter";
         if (month >= 2 && month <= 4) season = "Frühling";
         else if (month >= 5 && month <= 7) season = "Sommer";
         else if (month >= 8 && month <= 10) season = "Herbst";
-        const res = await fetch(`${baseUrl}/api/saisonpizza/saison/${season}`);
+        const res = await fetch(`${API_BASE}/api/saisonpizza/saison/${season}`);
         const data = await res.json();
         if (res.ok && !data.fehler) {
             return data;
@@ -292,124 +238,7 @@ async function getSeasonPizzaFromDB() {
 }
 
 /****************************************************
- * 3. Beschreibung → Zutaten IDs
- ****************************************************/
-function parseIngredients(desc) {
-    if (!desc) return { sauce: null, cheese: [], toppings: [] };
-
-    const parts = desc.split(",").map(x => x.trim().toLowerCase());
-
-    const sauce = PIZZA_DATA.sosse.find(s =>
-        parts.includes(s.beschreibung.toLowerCase())
-    )?.id || 41;
-
-    const cheese = PIZZA_DATA.kaese
-        .filter(k => parts.includes(k.beschreibung.toLowerCase()))
-        .map(x => x.id);
-
-    const toppings = PIZZA_DATA.belag
-        .filter(b => parts.includes(b.beschreibung.toLowerCase()))
-        .map(x => x.id);
-
-    return { sauce, cheese, toppings };
-}
-
-function buildPresetFromProduct(p) {
-    const ing = parseIngredients(p.details || p.beschreibung);
-
-    return {
-        size: 36,
-        dough: 39,
-        sauce: ing.sauce,
-        cheese: ing.cheese,
-        toppings: ing.toppings,
-        qty: 1
-    };
-}
-
-/****************************************************
- * 4. Konfigurator UI mit Backend erzeugen (im Konfigurator)
- ****************************************************/
-function buildConfiguratorUI() {
-    if (!isConfiguratorPage()) return;
-
-    const sizeSelect = document.getElementById("size");
-    sizeSelect.innerHTML = "";
-    PIZZA_DATA.groesse.forEach(p => {
-        sizeSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
-    });
-
-    const doughSelect = document.getElementById("dough");
-    doughSelect.innerHTML = "";
-    PIZZA_DATA.teig.forEach(p => {
-        doughSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
-    });
-
-    const sauceSelect = document.getElementById("sauce");
-    sauceSelect.innerHTML = "";
-    PIZZA_DATA.sosse.forEach(p => {
-        sauceSelect.innerHTML += `<option value="${p.id}">${p.beschreibung}</option>`;
-    });
-
-    const cheeseFieldset = document.querySelectorAll("fieldset")[0];
-    cheeseFieldset.innerHTML = `<legend>Käse</legend>`;
-    PIZZA_DATA.kaese.forEach(p => {
-        cheeseFieldset.innerHTML += `
-        <label class="chip">
-            <input type="checkbox" class="cheese" value="${p.id}">
-            ${p.beschreibung}
-        </label>`;
-    });
-
-    const toppingsFieldset = document.querySelectorAll("fieldset")[1];
-    toppingsFieldset.innerHTML = `<legend>Beläge</legend>`;
-    PIZZA_DATA.belag.forEach(p => {
-        toppingsFieldset.innerHTML += `
-        <label class="chip">
-            <input type="checkbox" class="topping" value="${p.id}">
-            ${p.beschreibung}
-        </label>`;
-    });
-}
-
-/****************************************************
- * 5. Preset im Konfigurator anwenden
- ****************************************************/
-async function applyPresetIfExists() {
-    if (!isConfiguratorPage()) return;
-
-    const params = new URLSearchParams(window.location.search);
-    if (!params.has("preset")) return;
-
-    let product = null;
-
-    if (params.get("preset") === "daily")
-        product = await getDailyPizzaFromDB();
-
-    if (params.get("preset") === "season")
-        product = await getSeasonPizzaFromDB();
-
-    if (!product) return;
-
-    const preset = buildPresetFromProduct(product);
-
-    document.getElementById("size").value = preset.size;
-    document.getElementById("dough").value = preset.dough;
-    document.getElementById("sauce").value = preset.sauce;
-
-    document.querySelectorAll(".cheese").forEach(el => {
-        el.checked = preset.cheese.includes(Number(el.value));
-    });
-
-    document.querySelectorAll(".topping").forEach(el => {
-        el.checked = preset.toppings.includes(Number(el.value));
-    });
-
-    updatePriceUI();
-}
-
-/****************************************************
- * 6. Index: Tages- & Saisonpizza anzeigen
+ * 3. Index: Tages- & Saisonpizza anzeigen
  ****************************************************/
 function euro(v) {
     return v.toFixed(2) + " €";
@@ -429,8 +258,7 @@ function renderDailyPizzaOnIndex() {
         el.innerHTML = `
             <strong>${p.bezeichnung}</strong><br>
             ${p.beschreibung}<br>
-            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong><br>
-            <a href="configurator.html?preset=daily">Jetzt konfigurieren →</a>
+            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
         `;
     }
     load();
@@ -450,63 +278,14 @@ function renderSeasonPizzaOnIndex() {
         el.innerHTML = `
             <strong>${p.bezeichnung}</strong><br>
             ${p.beschreibung}<br>
-            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong><br>
-            <a href="configurator.html?preset=season">Jetzt konfigurieren →</a>
+            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
         `;
     }
     load();
 }
 
 /****************************************************
- * 7. Auswahl-State erfassen
- ****************************************************/
-function collectState() {
-    if (!isConfiguratorPage()) return;
-
-    STATE = {
-        size: document.getElementById("size").value,
-        dough: document.getElementById("dough").value,
-        sauce: document.getElementById("sauce").value,
-        cheese: Array.from(document.querySelectorAll(".cheese:checked")).map(n => n.value),
-        toppings: Array.from(document.querySelectorAll(".topping:checked")).map(n => n.value),
-        qty: parseInt(document.getElementById("qty").value) || 1,
-        note: document.getElementById("note").value
-    };
-}
-
-/****************************************************
- * 8. Preis berechnen
- ****************************************************/
-function findProductById(id) {
-    id = Number(id);
-    return getAllProducts().find(p => p.id === id);
-}
-
-function calculatePrice() {
-    if (!isConfiguratorPage()) return 0;
-
-    collectState();
-    let total = 0;
-
-    total += findProductById(STATE.size)?.bruttopreis || 0;
-    total += findProductById(STATE.dough)?.bruttopreis || 0;
-    total += findProductById(STATE.sauce)?.bruttopreis || 0;
-
-    STATE.cheese.forEach(id => total += findProductById(id)?.bruttopreis || 0);
-    STATE.toppings.forEach(id => total += findProductById(id)?.bruttopreis || 0);
-
-    return total * STATE.qty;
-}
-
-function updatePriceUI() {
-    if (!isConfiguratorPage()) return;
-
-    const priceEl = document.getElementById("price");
-    if (priceEl) priceEl.textContent = euro(calculatePrice());
-}
-
-/****************************************************
- * 9. Mini-Warenkorb
+ * 4. Mini-Warenkorb
  ****************************************************/
 function loadCartFromStorage() {
     CART = JSON.parse(localStorage.getItem("cart") || "[]");
@@ -552,103 +331,7 @@ function renderMiniCart() {
 }
 
 /****************************************************
- * 10. In den Warenkorb legen (gleiche Produkte werden zusammengefasst)
- ****************************************************/
-function addToCart() {
-    if (!isConfiguratorPage()) return;
-
-    collectState();
-    const total = calculatePrice();
-
-    // Neue Pizza (sortierte Arrays für Vergleich)
-    const newItem = {
-        size: STATE.size,
-        dough: STATE.dough,
-        sauce: STATE.sauce,
-        cheese: [...STATE.cheese].sort(),
-        toppings: [...STATE.toppings].sort(),
-        qty: STATE.qty,
-        note: STATE.note.trim(),
-        total: total
-    };
-
-    // Prüfen nach identischer Pizza
-    const duplicate = CART.find(item =>
-        item.size === newItem.size &&
-        item.dough === newItem.dough &&
-        item.sauce === newItem.sauce &&
-        item.note === newItem.note &&
-        JSON.stringify(item.cheese) === JSON.stringify(newItem.cheese) &&
-        JSON.stringify(item.toppings) === JSON.stringify(newItem.toppings)
-    );
-
-    if (duplicate) {
-        // wenn ja, Menge erhöhen
-        duplicate.qty += newItem.qty;
-        duplicate.total += newItem.total;
-
-        // sonst neuen Text erzeugen (inkl. Menge)
-        duplicate.text = generatePizzaTextFromObject(duplicate);
-    } else {
-        // Text einmalig erzeugen
-        newItem.text = generatePizzaTextFromObject(newItem);
-        CART.push(newItem);
-    }
-
-    saveCart();
-    renderMiniCart();
-}
-
-/****************************************************
- * Hilfsfunktion: Text für zusammengefasste Pizza
- ****************************************************/
-function generatePizzaTextFromObject(item) {
-    const size = findProductById(item.size)?.beschreibung;
-    const dough = findProductById(item.dough)?.beschreibung;
-    const sauce = findProductById(item.sauce)?.beschreibung;
-
-    const cheese = item.cheese
-        .map(id => findProductById(id)?.beschreibung)
-        .join(", ");
-
-    const toppings = item.toppings
-        .map(id => findProductById(id)?.beschreibung)
-        .join(", ");
-
-    const noteText = item.note
-        ? `<br><em>Anmerkung: ${item.note}</em>`
-        : "";
-
-    return `${size}, ${dough}, ${sauce}, Käse: ${cheese}, Beläge: ${toppings}${noteText}`;
-}
-
-
-/****************************************************
- * 11. Event-Handler
- ****************************************************/
-function attachEventHandlers() {
-    if (!isConfiguratorPage()) return;
-
-    const sizeEl = document.getElementById("size");
-    const doughEl = document.getElementById("dough");
-    const sauceEl = document.getElementById("sauce");
-    const qtyEl = document.getElementById("qty");
-    const addBtn = document.getElementById("add-to-cart");
-
-    if (sizeEl) sizeEl.addEventListener("change", updatePriceUI);
-    if (doughEl) doughEl.addEventListener("change", updatePriceUI);
-    if (sauceEl) sauceEl.addEventListener("change", updatePriceUI);
-    if (qtyEl) qtyEl.addEventListener("input", updatePriceUI);
-
-    document.querySelectorAll(".cheese, .topping").forEach(el =>
-        el.addEventListener("change", updatePriceUI)
-    );
-
-    if (addBtn) addBtn.addEventListener("click", addToCart);
-}
-
-/****************************************************
- * 12. Warenkorb-Seite rendern
+ * 5. Warenkorb-Seite rendern
  ****************************************************/
 function renderCartPage() {
     const cartBody = document.getElementById("cart-body");
@@ -756,146 +439,79 @@ function attachCartQtyListeners() {
 
 
 /****************************************************
- * 13. Checkout-Button absichern + Bestellung speichern
+ * 6. Checkout-Button absichern
  ****************************************************/
 function protectCheckoutWhenCartEmpty() {
-  const coForm = document.getElementById("checkout-form");
-  if (!coForm) return;
+    const coForm = document.getElementById("checkout-form");
+    if (!coForm) return;
 
-  coForm.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
-    if (!currentCart.length) {
-      alert("Ihr Warenkorb ist noch leer.");
-      return;
-    }
-    await sendOrderToBackend();
-  });
+    coForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
+        if (!currentCart.length) {
+            alert("Ihr Warenkorb ist noch leer.");
+            return;
+        }
+        completeOrder();
+    });
 }
 
 /****************************************************
- * 14. Bestellung an das Backend senden
+ * 7. Bestellung abschließen (nur lokale Verarbeitung)
  ****************************************************/
-async function sendOrderToBackend() {
-  // Warenkorb aus localStorage holen
-  const cart = JSON.parse(localStorage.getItem("cart") || "[]");
-  if (!cart.length) {
-    alert("Warenkorb ist leer – Bestellung nicht möglich.");
-    return;
-  }
-
-  // Formular-Felder einsammeln (Checkout-Seite)
-  const name   = document.getElementById("co-name")?.value.trim()   || "";
-  const street = document.getElementById("co-street")?.value.trim() || "";
-  const zip    = document.getElementById("co-zip")?.value.trim()    || "";
-  const city   = document.getElementById("co-city")?.value.trim()   || "";
-  const phone  = document.getElementById("co-phone")?.value.trim()  || "";
-  const email  = document.getElementById("co-email")?.value.trim()  || "";
-  const asap   = document.getElementById("co-asap")?.checked        || false;
-  const dtVal  = document.getElementById("co-datetime")?.value      || null;
-  const note   = document.getElementById("co-note")?.value.trim()   || "";
-
-  // Pflichtfelder prüfen
-  if (!name || !street || !zip || !city || !email) {
-    alert("Bitte alle Pflichtfelder ausfüllen (Name, Adresse, PLZ, Stadt, E-Mail).");
-    return;
-  }
-
-  // === WICHTIG: HIER EINE ECHTE PRODUKT-ID EINTRAGEN ===
-  // z.B. die ID einer speziellen "Konfigurator-Pizza"
-  // oder einer Standard-Pizza, die du dafür verwendest.
-  const KONFIG_PIZZA_PRODUKT_ID = 302; // <-- ANPASSEN!
-
-  // Zahlungsart: hier eine existierende Zahlungsart-ID aus der DB nutzen
-  const zahlungsart = { id: 1 }; // z.B. 1 = Barzahlung
-
-  // Bestellpositionen aus dem Warenkorb bauen
-  const bestellpositionen = cart.map(item => {
-    // wir nutzen Menge aus dem Warenkorb
-    return {
-      produkt: { id: KONFIG_PIZZA_PRODUKT_ID },
-      menge: item.qty
-      // einzelpreis wird im Standard-DAO nicht immer gebraucht,
-      // falls doch: hier ergänzen
-      // einzelpreis: item.total / item.qty
-    };
-  });
-
-  // Payload nach Erwartung von /api/bestellung
-  const payload = {
-    // bestellzeitpunkt weglassen -> Backend setzt helper.getNow()
-    zahlungsart,
-    bestellpositionen
-    // besteller lassen wir komplett weg -> wird im Service auf null gesetzt
-  };
-
-  console.log("Sende Bestellung an /api/bestellung:", payload);
-
-  // === Zusammenfassung für Thankyou-Seite vorbereiten ===
-  let sumNet = 0;
-  cart.forEach(item => {
-    sumNet += item.total || 0;
-  });
-
-  const shippingNet = 2.00;
-  const vatAmount   = (sumNet + shippingNet) * 0.19;
-  const grossTotal  = sumNet + shippingNet + vatAmount;
-
-  const deliveryText = asap
-    ? "Schnellstmögliche Lieferung"
-    : (dtVal ? new Date(dtVal).toLocaleString("de-DE") : "–");
-
-  const lastOrderSummary = {
-    kunde: {
-      name,
-      street,
-      zip,
-      city,
-      phone,
-      email
-    },
-    items: cart,
-    net: sumNet,
-    shipping: shippingNet,
-    vat: vatAmount,
-    total: grossTotal,
-    deliveryText,
-    note
-  };
-
-  try {
-    const response = await fetch("http://127.0.0.1:8000/api/bestellung", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(payload)
-});
-
-
-    const data = await response.json();
-
-    if (!response.ok || data.fehler) {
-      console.error("Fehler beim Speichern der Bestellung:", data);
-      alert("Fehler beim Speichern der Bestellung: " + (data.nachricht || "Unbekannter Fehler"));
-      return;
+function completeOrder() {
+    const cart = JSON.parse(localStorage.getItem("cart") || "[]");
+    if (!cart.length) {
+        alert("Warenkorb ist leer – Bestellung nicht möglich.");
+        return;
     }
 
-    // *** HIER: Summary im localStorage ablegen ***
+    const name   = document.getElementById("co-name")?.value.trim()   || "";
+    const street = document.getElementById("co-street")?.value.trim() || "";
+    const zip    = document.getElementById("co-zip")?.value.trim()    || "";
+    const city   = document.getElementById("co-city")?.value.trim()   || "";
+    const phone  = document.getElementById("co-phone")?.value.trim()  || "";
+    const email  = document.getElementById("co-email")?.value.trim()  || "";
+    const asap   = document.getElementById("co-asap")?.checked        || false;
+    const dtVal  = document.getElementById("co-datetime")?.value      || null;
+    const note   = document.getElementById("co-note")?.value.trim()   || "";
+
+    if (!name || !street || !zip || !city || !email) {
+        alert("Bitte alle Pflichtfelder ausfüllen (Name, Adresse, PLZ, Stadt, E-Mail).");
+        return;
+    }
+
+    let sumNet = 0;
+    cart.forEach(item => {
+        sumNet += item.total || 0;
+    });
+
+    const shippingNet = 2.00;
+    const vatAmount   = (sumNet + shippingNet) * 0.19;
+    const grossTotal  = sumNet + shippingNet + vatAmount;
+
+    const deliveryText = asap
+        ? "Schnellstmögliche Lieferung"
+        : (dtVal ? new Date(dtVal).toLocaleString("de-DE") : "–");
+
+    const lastOrderSummary = {
+        kunde: { name, street, zip, city, phone, email },
+        items: cart,
+        net: sumNet,
+        shipping: shippingNet,
+        vat: vatAmount,
+        total: grossTotal,
+        deliveryText,
+        note
+    };
+
     localStorage.setItem("lastOrderSummary", JSON.stringify(lastOrderSummary));
-
-
-    alert("Bestellung wurde erfolgreich gespeichert! (Bestell-ID: " + (data.id || "?") + ")");
-    // Warenkorb leeren und auf Danke-Seite leiten
     localStorage.removeItem("cart");
     window.location.href = "thankyou.html";
-  } catch (err) {
-    console.error("Netzwerkfehler beim Senden der Bestellung:", err);
-    alert("Netzwerkfehler beim Senden der Bestellung.");
-  }
 }
 
-
 /****************************************************
- * 15. Checkout-Seite: Bestellung anzeigen
+ * 8. Checkout-Seite: Bestellung anzeigen
  ****************************************************/
 function renderCheckoutSummary() {
     const coList     = document.getElementById("checkout-list");
@@ -947,7 +563,7 @@ function renderCheckoutSummary() {
 }
 
 /****************************************************
- * Thankyou-Seite: Bestellübersicht anzeigen
+ * 9. Thankyou-Seite: Bestellübersicht anzeigen
  ****************************************************/
 function renderThankyouSummary() {
   const netEl = document.getElementById("ty-net");
@@ -1008,17 +624,17 @@ function renderThankyouSummary() {
  * START
  ****************************************************/
 window.addEventListener("DOMContentLoaded", () => {
-    loadPizzaConfig();
+    initApp();
     renderCartPage();
     protectCheckoutWhenCartEmpty();
-    initCheckoutDatetimeLogic(); 
-    renderCheckoutSummary();        // Warenkorb rechts auf checkout.html anzeigen
+    initCheckoutDatetimeLogic();
+    renderCheckoutSummary();
     renderThankyouSummary();
     initContactForm();
 });
 
 /****************************************************
- * im Checkout-Bereich: Lieferzeitpunkt wählen, entweder ASAP oder Datum
+ * 10. Checkout: Lieferzeitpunkt wählen (ASAP oder Datum)
  ****************************************************/
 function initCheckoutDatetimeLogic() {
     const asapCheckbox = document.getElementById("co-asap");
