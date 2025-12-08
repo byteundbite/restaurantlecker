@@ -427,13 +427,44 @@ async function initConfiguratorPage() {
             const total = perPizza * qty;
             const summary = buildConfiguratorSummary();
 
-            const hasSelection = document.getElementById('size')?.value && document.getElementById('dough')?.value && document.getElementById('sauce')?.value;
+            const sizeEl = document.getElementById('size');
+            const doughEl = document.getElementById('dough');
+            const sauceEl = document.getElementById('sauce');
+
+            const hasSelection = sizeEl?.value && doughEl?.value && sauceEl?.value;
             if (!hasSelection) {
                 alert('Bitte wähle zunächst deine Komponenten.');
                 return;
             }
 
-            CART.push({ text: summary || 'Individuelle Pizza', qty, total });
+            // Sammle alle ausgewählten Käsesorten
+            const cheeses = Array.from(document.querySelectorAll('.cheese:checked')).map(ch => ({
+                id: ch.value,
+                bezeichnung: ch.parentElement.textContent.trim()
+            }));
+
+            // Sammle alle ausgewählten Beläge
+            const toppings = Array.from(document.querySelectorAll('.topping:checked')).map(top => ({
+                id: top.value,
+                bezeichnung: top.parentElement.textContent.trim()
+            }));
+
+            const note = document.getElementById('note')?.value.trim() || '';
+
+            // Speichere mit allen Komponenten-Informationen
+            CART.push({
+                text: summary || 'Individuelle Pizza',
+                qty,
+                total,
+                components: {
+                    sizeId: sizeEl.value,
+                    doughId: doughEl.value,
+                    sauceId: sauceEl.value,
+                    cheeses,
+                    toppings,
+                    note
+                }
+            });
             saveCart();
             renderMiniCart();
             // Auf der Konfiguratorseite bleiben; Mini-Warenkorb aktualisieren
@@ -706,9 +737,9 @@ function protectCheckoutWhenCartEmpty() {
 }
 
 /****************************************************
- * 7. Bestellung abschließen (nur lokale Verarbeitung)
+ * 7. Bestellung abschließen (an Backend senden)
  ****************************************************/
-function completeOrder() {
+async function completeOrder() {
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     if (!cart.length) {
         alert("Warenkorb ist leer – Bestellung nicht möglich.");
@@ -743,7 +774,7 @@ function completeOrder() {
         ? "Schnellstmögliche Lieferung"
         : (dtVal ? new Date(dtVal).toLocaleString("de-DE") : "–");
 
-    const lastOrderSummary = {
+    const orderData = {
         kunde: { name, street, zip, city, phone, email },
         items: cart,
         net: sumNet,
@@ -751,12 +782,34 @@ function completeOrder() {
         vat: vatAmount,
         total: grossTotal,
         deliveryText,
-        note
+        asap,
+        deliveryDateTime: dtVal || null,
+        orderNote: note
     };
 
-    localStorage.setItem("lastOrderSummary", JSON.stringify(lastOrderSummary));
-    localStorage.removeItem("cart");
-    window.location.href = "thankyou.html";
+    try {
+        const response = await fetch(`${API_BASE}/api/bestellung`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(orderData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.fehler) {
+            console.error('Fehler bei der Bestellabsendung:', data);
+            alert('Fehler beim Absenden der Bestellung: ' + (data.nachricht || 'Unbekannter Fehler'));
+            return;
+        }
+
+        // Erfolgreich: Speichere die Zusammenfassung und leere den Warenkorb
+        localStorage.setItem("lastOrderSummary", JSON.stringify(orderData));
+        localStorage.removeItem("cart");
+        window.location.href = "thankyou.html";
+    } catch (err) {
+        console.error('Netzwerkfehler beim Absenden der Bestellung:', err);
+        alert('Netzwerkfehler beim Absenden der Bestellung. Bitte versuchen Sie es erneut.');
+    }
 }
 
 /****************************************************

@@ -117,3 +117,4 @@ serviceRouter.post('/konfigurator/konfiguration', function(request, response) {
 });
 
 module.exports = serviceRouter;
+
