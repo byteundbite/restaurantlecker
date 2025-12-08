@@ -378,3 +378,31 @@ textarea{ resize: vertical; }
     }
 }
 
+/* ========== Hilfsklassen für versteckte Elemente ========== */
+.hidden {
+    display: none;
+}
+
+/* ========== Checkout-spezifische Stile ========== */
+.form-row.delivery-option {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+}
+
+.form-row.delivery-option .chip {
+    margin: 0;
+}
+
+/* ========== Danke-Seite Spacing ========== */
+h4.section-title {
+    margin-top: 1rem;
+}
+
+.summary-line.spaced {
+    margin-top: 1rem;
+}
+
+.summary-line.extra-spaced {
+    margin-top: 1.5rem;
+}
+
