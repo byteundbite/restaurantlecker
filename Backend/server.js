@@ -14,6 +14,9 @@
 Object.fromEntries = l => l.reduce((a, [k,v]) => ({...a, [k]: v}), {})
 /////////////////
 
+// Zeitzone für Bestellnummern und Timestamps
+const TIMEZONE = 'Europe/Berlin'; // CET/CEST
+
 const helper = require('./helper.js');
 const path = require('path');
 console.log('Starting server...');
@@ -40,6 +43,7 @@ try {
     
     // provide service router with database connection / store the database connection in global server environment
     app.locals.dbConnection = dbConnection;
+    app.locals.timezone = TIMEZONE;
 
     console.log('Binding middleware...');
     // Serves static files (HTML, CSS, JS, images) from the frontend directory
@@ -70,6 +74,9 @@ try {
     console.log('Binding enpoints, top level Path at ' + TOPLEVELPATH);
     
     var serviceRouter = require('./services/konfigurator.js');
+    app.use(TOPLEVELPATH, serviceRouter);
+
+    serviceRouter = require('./services/bestellung.js');
     app.use(TOPLEVELPATH, serviceRouter);
 
     serviceRouter = require('./services/kontakt.js');
