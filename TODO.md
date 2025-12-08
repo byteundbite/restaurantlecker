@@ -1,0 +1,4 @@
+- konfigurator soll zurückgesetzt werden wenn die konfiguration im warenkorn landet
+- Saison- und Tagespizza mit zwei buttons/verlinkungen mit "konfigurieren" und "in Warenkorb legen" versehen -> beim "konfigurieren" soll die übergebene pizza (Saison od. Tages) un ihre Komponenten fertig ausgewähl im konfigurator aber NICHT im Warenkorb land, sodass man theoretisch noch weitere beläge hinzufügen oder ggf entfernen kann
+- konsistente und zentrale preisberechnungslogik -> vlt. weitere tabellen für lieferkosten und mehrwertsteuer und allg die preise überearbeiten
+- index.html anders strukturieren -> zwei spalten: links der willkommenstext usw. und rechts die saison/tages-empfehlung
