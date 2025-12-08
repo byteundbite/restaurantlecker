@@ -5,158 +5,159 @@ var serviceRouter = express.Router();
 
 console.log('- Service Bestellung');
 
-serviceRouter.get('/bestellung/gib/:id', function(request, response) {
-    console.log('Service Bestellung: Client requested one record, id=' + request.params.id);
-
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
-    try {
-        var obj = bestellungDao.loadById(request.params.id);
-        console.log('Service Bestellung: Record loaded');
-        response.status(200).json(obj);
-    } catch (ex) {
-        console.error('Service Bestellung: Error loading record by id. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
-    }
-});
-
-serviceRouter.get('/bestellung/alle', function(request, response) {
-    console.log('Service Bestellung: Client requested all records');
-
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
-    try {
-        var arr = bestellungDao.loadAll();
-        console.log('Service Bestellung: Records loaded, count=' + arr.length);
-        response.status(200).json(arr);
-    } catch (ex) {
-        console.error('Service Bestellung: Error loading all records. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
-    }
-});
-
-serviceRouter.get('/bestellung/existiert/:id', function(request, response) {
-    console.log('Service Bestellung: Client requested check, if record exists, id=' + request.params.id);
-
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
-    try {
-        var exists = bestellungDao.exists(request.params.id);
-        console.log('Service Bestellung: Check if record exists by id=' + request.params.id + ', exists=' + exists);
-        response.status(200).json({'id': request.params.id, 'existiert': exists});
-    } catch (ex) {
-        console.error('Service Bestellung: Error checking if record exists. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
-    }
-});
-
+/**
+ * POST /api/bestellung
+ * Erstelle eine neue Bestellung
+ * 
+ * Body:
+ * {
+ *   "kunde": { "name", "street", "zip", "city", "email", "phone" },
+ *   "items": [ { "text", "qty", "total", "components": {...} } ],
+ *   "orderNote": "...",
+ *   "asap": true/false,
+ *   "deliveryDateTime": "2025-12-10T14:00",
+ *   "net": 25.00,
+ *   "shipping": 2.00,
+ *   "vat": 5.13,
+ *   "total": 32.13
+ * }
+ */
 serviceRouter.post('/bestellung', function(request, response) {
-    console.log('Service Bestellung: Client requested creation of new record');
+    console.log('Service Bestellung: Client requested to create order');
 
-    var errorMsgs=[];
-    if (helper.isUndefined(request.body.bestellzeitpunkt)) {
-        request.body.bestellzeitpunkt = helper.getNow();
-    } else if (!helper.isGermanDateTimeFormat(request.body.bestellzeitpunkt)) {
-        errorMsgs.push('bestellzeitpunkt hat das falsche Format, erlaubt: dd.mm.jjjj hh.mm.ss');
-    } else {
-        request.body.bestellzeitpunkt = helper.parseGermanDateTimeString(request.body.bestellzeitpunkt);
-    }
-    if (helper.isUndefined(request.body.besteller)) {
-        request.body.besteller = null;
-    } else if (helper.isUndefined(request.body.besteller.id)) {
-        errorMsgs.push('besteller gesetzt, aber id fehlt');
-    } else {
-        request.body.besteller = request.body.besteller.id;
-    }
-    if (helper.isUndefined(request.body.zahlungsart)) {
-        errorMsgs.push('zahlungsart fehlt');
-    } else if (helper.isUndefined(request.body.zahlungsart.id)) {
-        errorMsgs.push('zahlungsart gesetzt, aber id fehlt');
-    }
-    if (helper.isUndefined(request.body.bestellpositionen)) {
-        errorMsgs.push('bestellpositionen fehlen');
-    } else if (!helper.isArray(request.body.bestellpositionen)) {
-        errorMsgs.push('bestellpositionen ist kein array');
-    } else if (request.body.bestellpositionen.length == 0) {
-        errorMsgs.push('bestellpositionen is leer, nichts zu speichern');
-    }
-    
-    if (errorMsgs.length > 0) {
-        console.log('Service Bestellung: Creation not possible, data missing');
-        response.status(400).json({ 'fehler': true, 'nachricht': 'Funktion nicht möglich. Fehlende Daten: ' + helper.concatArray(errorMsgs) });
-        return;
-    }
+    const body = request.body || {};
+    const kunde = body.kunde || {};
+    const items = body.items || [];
+    const orderNote = body.orderNote || '';
+    const asap = body.asap || false;
+    const deliveryDateTime = body.deliveryDateTime || null;
+    const net = body.net || 0;
+    const shipping = body.shipping || 0;
+    const vat = body.vat || 0;
+    const total = body.total || 0;
 
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
+    const bestellungDao = new BestellungDao(request.app.locals.dbConnection, request.app.locals.timezone);
+
     try {
-        var obj = bestellungDao.create(request.body.bestellzeitpunkt, request.body.besteller, request.body.zahlungsart.id, request.body.bestellpositionen);
-        console.log('Service Bestellung: Record inserted');
-        response.status(200).json(obj);
+        // Validierungen
+        if (!kunde.name || !kunde.street || !kunde.zip || !kunde.city || !kunde.email) {
+            console.warn('Service Bestellung: Incomplete customer data');
+            return response.status(400).json({
+                fehler: true,
+                nachricht: 'Kundendaten sind unvollständig (Name, Straße, PLZ, Stadt, E-Mail erforderlich)'
+            });
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            console.warn('Service Bestellung: Empty cart');
+            return response.status(400).json({
+                fehler: true,
+                nachricht: 'Warenkorb ist leer'
+            });
+        }
+
+        // Erstelle die Bestellung
+        const orderResult = bestellungDao.createOrder(
+            kunde,
+            items,
+            orderNote,
+            asap,
+            deliveryDateTime,
+            net,
+            shipping,
+            vat,
+            total
+        );
+
+        console.log('Service Bestellung: Order created successfully with id=' + orderResult.orderId + ' (' + orderResult.bestellnummer + ')');
+        
+        response.status(201).json({
+            fehler: false,
+            nachricht: 'Bestellung erfolgreich gespeichert',
+            orderId: orderResult.orderId,
+            bestellnummer: orderResult.bestellnummer,
+            configIds: orderResult.configIds
+        });
+
     } catch (ex) {
-        console.error('Service Bestellung: Error creating new record. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
+        console.error('Service Bestellung: Error creating order. Exception: ' + ex.message);
+        response.status(400).json({
+            fehler: true,
+            nachricht: ex.message
+        });
     }
 });
 
-serviceRouter.put('/bestellung', function(request, response) {
-    console.log('Service Bestellung: Client requested update of existing record');
+/**
+ * GET /api/bestellung/:orderId
+ * Hole Bestelldetails
+ */
+serviceRouter.get('/bestellung/:orderId', function(request, response) {
+    console.log('Service Bestellung: Client requested order details');
 
-    var errorMsgs=[];
-    if (helper.isUndefined(request.body.id)) 
-        errorMsgs.push('id fehlt');
-    if (helper.isUndefined(request.body.bestellzeitpunkt)) {
-        request.body.bestellzeitpunkt = helper.getNow();
-    } else if (!helper.isGermanDateTimeFormat(request.body.bestellzeitpunkt)) {
-        errorMsgs.push('bestellzeitpunkt hat das falsche Format, erlaubt: dd.mm.jjjj hh.mm.ss');
-    } else {
-        request.body.bestellzeitpunkt = helper.parseGermanDateTimeString(request.body.bestellzeitpunkt);
-    }
-    if (helper.isUndefined(request.body.besteller)) {
-        request.body.besteller = null;
-    } else if (helper.isUndefined(request.body.besteller.id)) {
-        errorMsgs.push('besteller gesetzt, aber id fehlt');
-    } else {
-        request.body.besteller = request.body.besteller.id;
-    }
-    if (helper.isUndefined(request.body.zahlungsart)) {
-        errorMsgs.push('zahlungsart fehlt');
-    } else if (helper.isUndefined(request.body.zahlungsart.id)) {
-        errorMsgs.push('zahlungsart gesetzt, aber id fehlt');
-    }
-    if (helper.isUndefined(request.body.bestellpositionen)) {
-        errorMsgs.push('bestellpositionen fehlen');
-    } else if (!helper.isArray(request.body.bestellpositionen)) {
-        errorMsgs.push('bestellpositionen ist kein array');
-    } else if (request.body.bestellpositionen.length == 0) {
-        errorMsgs.push('bestellpositionen is leer, nichts zu speichern');
+    const orderId = request.params.orderId;
+
+    if (!helper.isNumeric(orderId)) {
+        return response.status(400).json({
+            fehler: true,
+            nachricht: 'Ungültige Bestellungs-ID'
+        });
     }
 
-    if (errorMsgs.length > 0) {
-        console.log('Service Bestellung: Update not possible, data missing');
-        response.status(400).json({ 'fehler': true, 'nachricht': 'Funktion nicht möglich. Fehlende Daten: ' + helper.concatArray(errorMsgs) });
-        return;
-    }
+    const bestellungDao = new BestellungDao(request.app.locals.dbConnection, request.app.locals.timezone);
 
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
     try {
-        var obj = bestellungDao.update(request.body.id, request.body.bestellzeitpunkt, request.body.besteller, request.body.zahlungsart.id, request.body.bestellpositionen);
-        console.log('Service Bestellung: Record updated, id=' + request.body.id);
-        response.status(200).json(obj);
+        const order = bestellungDao.getOrderById(orderId);
+
+        if (!order) {
+            return response.status(404).json({
+                fehler: true,
+                nachricht: 'Bestellung nicht gefunden'
+            });
+        }
+
+        console.log('Service Bestellung: Order ' + orderId + ' retrieved successfully');
+        response.status(200).json(order);
+
     } catch (ex) {
-        console.error('Service Bestellung: Error updating record by id. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
-    }    
+        console.error('Service Bestellung: Error retrieving order. Exception: ' + ex.message);
+        response.status(400).json({
+            fehler: true,
+            nachricht: ex.message
+        });
+    }
 });
 
-serviceRouter.delete('/bestellung/:id', function(request, response) {
-    console.log('Service Bestellung: Client requested deletion of record, id=' + request.params.id);
+/**
+ * GET /api/bestellung/kunde/:email
+ * Hole alle Bestellungen eines Kunden
+ */
+serviceRouter.get('/bestellung/kunde/:email', function(request, response) {
+    console.log('Service Bestellung: Client requested orders for customer');
 
-    const bestellungDao = new BestellungDao(request.app.locals.dbConnection);
+    const email = request.params.email;
+
+    if (!email || email.length === 0) {
+        return response.status(400).json({
+            fehler: true,
+            nachricht: 'E-Mail-Adresse erforderlich'
+        });
+    }
+
+    const bestellungDao = new BestellungDao(request.app.locals.dbConnection, request.app.locals.timezone);
+
     try {
-        var obj = bestellungDao.loadById(request.params.id);
-        bestellungDao.delete(request.params.id);
-        console.log('Service Bestellung: Deletion of record successfull, id=' + request.params.id);
-        response.status(200).json({ 'gelöscht': true, 'eintrag': obj });
+        const orders = bestellungDao.getOrdersByCustomerEmail(email);
+
+        console.log('Service Bestellung: Retrieved ' + orders.length + ' orders for customer ' + email);
+        response.status(200).json(orders);
+
     } catch (ex) {
-        console.error('Service Bestellung: Error deleting record. Exception occured: ' + ex.message);
-        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
+        console.error('Service Bestellung: Error retrieving customer orders. Exception: ' + ex.message);
+        response.status(400).json({
+            fehler: true,
+            nachricht: ex.message
+        });
     }
 });
 

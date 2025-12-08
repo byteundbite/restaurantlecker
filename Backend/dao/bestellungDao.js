@@ -1,214 +1,308 @@
 const helper = require('../helper.js');
-const BestellpositionDao = require('./bestellpositionDao.js');
-const PersonDao = require('./personDao.js');
-const ZahlungsartDao = require('./zahlungsartDao.js');
 
 class BestellungDao {
 
-    constructor(dbConnection) {
+    constructor(dbConnection, timezone = 'Europe/Berlin') {
         this._conn = dbConnection;
+        this._timezone = timezone;
     }
 
     getConnection() {
         return this._conn;
     }
 
-    loadById(id) {
-        const bestellpositionDao = new BestellpositionDao(this._conn);
-        const personDao = new PersonDao(this._conn);
-        const zahlungsartDao = new ZahlungsartDao(this._conn);
-
-        var sql = 'SELECT * FROM Bestellung WHERE id=?';
-        var statement = this._conn.prepare(sql);
-        var result = statement.get(id);
-
-        if (helper.isUndefined(result)) 
-            throw new Error('No Record found by id=' + id);
-
-        result.bestellzeitpunkt = helper.formatToGermanDateTime(helper.parseSQLDateTimeString(result.bestellzeitpunkt));
-
-        if (helper.isNull(result.bestellerId)) {
-            result.besteller = null;
-        } else {
-            result.besteller = personDao.loadById(result.bestellerId);
-        }
-        delete result.bestellerId;
-
-        result.zahlungsart = zahlungsartDao.loadById(result.zahlungsartId);
-        delete result.zahlungsartId;
-
-        result.bestellpositionen = bestellpositionDao.loadByParent(result.id);
-  
-        result.total = { 'rabatt': 0, 'netto': 0, 'brutto': 0, 'mehrwertsteuer': 0 };
-
-        for (var i = 0; i < result.bestellpositionen.length; i++) {
-            result.total.rabatt += result.bestellpositionen[i].rabattsumme;
-            result.total.netto += result.bestellpositionen[i].nettosumme;
-            result.total.brutto += result.bestellpositionen[i].bruttosumme;
-            result.total.mehrwertsteuer += result.bestellpositionen[i].mehrwertsteuersumme;
-        }
-
-        result.total.rabatt = helper.round(result.total.rabatt);
-        result.total.netto = helper.round(result.total.netto);
-        result.total.brutto = helper.round(result.total.brutto);
-        result.total.mehrwertsteuer = helper.round(result.total.mehrwertsteuer);
-
-        result.mehrwertsteueranteile = this.getTaxParts(result.bestellpositionen);
-
-        return result;
+    getTimezone() {
+        return this._timezone;
     }
 
-    loadAll() {
-        const bestellpositionDao = new BestellpositionDao(this._conn);
-        const personDao = new PersonDao(this._conn);
-        const zahlungsartDao = new ZahlungsartDao(this._conn);
-
-        var sql = 'SELECT * FROM Bestellung';
-        var statement = this._conn.prepare(sql);
-        var result = statement.all();
-
-        if (helper.isArrayEmpty(result)) 
-            return [];
-
-        for (var i = 0; i < result.length; i++) {
-            result[i].bestellzeitpunkt = helper.formatToGermanDateTime(helper.parseSQLDateTimeString(result[i].bestellzeitpunkt));
-
-            if (helper.isNull(result[i].bestellerId)) {
-                result[i].besteller = null;
-            } else {
-                result[i].besteller = personDao.loadById(result[i].bestellerId);
-            }
-            delete result[i].bestellerId;
-
-            result[i].zahlungsart = zahlungsartDao.loadById(result[i].zahlungsartId);
-            delete result[i].zahlungsartid;
-
-            result[i].bestellpositionen = bestellpositionDao.loadByParent(result[i].id);
-
-            result[i].total = { 'rabatt': 0, 'netto': 0, 'brutto': 0, 'mehrwertsteuer': 0 };
-
-            for (var element of result[i].bestellpositionen) {
-                result[i].total.rabatt += element.rabattsumme;
-                result[i].total.netto += element.nettosumme;
-                result[i].total.brutto += element.bruttosumme;
-                result[i].total.mehrwertsteuer += element.mehrwertsteuersumme;
-            }
-
-            result[i].total.rabatt = helper.round(result[i].total.rabatt);
-            result[i].total.netto = helper.round(result[i].total.netto);
-            result[i].total.brutto = helper.round(result[i].total.brutto);
-            result[i].total.mehrwertsteuer = helper.round(result[i].total.mehrwertsteuer);
-
-            result[i].mehrwertsteueranteile = this.getTaxParts(result[i].bestellpositionen);
-        }
-
-        return result;
-    }
-
-    exists(id) {
-        var sql = 'SELECT COUNT(id) AS cnt FROM Bestellung WHERE id=?';
-        var statement = this._conn.prepare(sql);
-        var result = statement.get(id);
-
-        if (result.cnt == 1) 
-            return true;
-
-        return false;
-    }
-
-    create(bestellzeitpunkt = null, bestellerId = null, zahlungsartId = null, bestellpositionen = []) {
-        const bestellpositionDao = new BestellpositionDao(this._conn);
-
-        if (helper.isNull(bestellzeitpunkt)) 
-            bestellzeitpunkt = helper.getNow();
-
-        var sql = 'INSERT INTO Bestellung (bestellzeitpunkt,bestellerId,zahlungsartId) VALUES (?,?,?)';
-        var statement = this._conn.prepare(sql);
-        var params = [helper.formatToSQLDateTime(bestellzeitpunkt), bestellerId, zahlungsartId];
-        var result = statement.run(params);
-
-        if (result.changes != 1) 
-            throw new Error('Could not insert new Record. Data: ' + params);
-
-        if (bestellpositionen.length > 0) {
-            for (var element of bestellpositionen) {
-                bestellpositionDao.create(result.lastInsertRowid, element.produkt.id, element.menge);
-            }
-        }
-
-        return this.loadById(result.lastInsertRowid);
-    }
-
-    update(id, bestellzeitpunkt = null, bestellerId = null, zahlungsartId = null, bestellpositionen = []) {
-        const bestellpositionDao = new BestellpositionDao(this._conn);
-        bestellpositionDao.deleteByParent(id);
-
-        if (helper.isNull(bestellzeitpunkt)) 
-            bestellzeitpunkt = helper.getNow();
-
-        var sql = 'UPDATE Bestellung SET bestellzeitpunkt=?,bestellerId=?,zahlungsartId=? WHERE id=?';
-        var statement = this._conn.prepare(sql);
-        var params = [helper.formatToSQLDateTime(bestellzeitpunkt), bestellerId, zahlungsartId, id];
-        var result = statement.run(params);
-
-        if (result.changes != 1) 
-            throw new Error('Could not update existing Record. Data: ' + params);
+    /**
+     * Generiert eine eindeutige Bestellnummer basierend auf der konfigurierten Zeitzone
+     * Format: YYYYMMDD-HHmmss-XXXX
+     * @returns {String} Bestellnummer
+     */
+    generateBestellnummer() {
+        const now = new Date();
         
-        if (bestellpositionen.length > 0) {
-            for (var element of bestellpositionen) {
-                bestellpositionDao.create(id, element.produkt.id, element.menge);
-            }
-        }
-
-        return this.loadById(id);
-    }
-
-    delete(id) {
-        try {
-            const bestellpositionDao = new BestellpositionDao(this._conn);
-            bestellpositionDao.deleteByParent(id);
-
-            var sql = 'DELETE FROM Bestellung WHERE id=?';
-            var statement = this._conn.prepare(sql);
-            var result = statement.run(id);
-
-            if (result.changes != 1) 
-                throw new Error('Could not delete Record by id=' + id);
-
-            return true;
-        } catch (ex) {
-            throw new Error('Could not delete Record by id=' + id + '. Reason: ' + ex.message);
-        }
-    }
-
-    // extract the single tax parts and return as array of objects
-    getTaxParts(pos) {
-        var arr = [];
-        var idx = -1;
-
-        // walk all positions
-        for (var x = 0; x < pos.length; x++) {
-            // find item
-            idx = -1;
-            for (var i = 0; i < arr.length; i++) {
-                if (pos[x].produkt.mehrwertsteuer.id == arr[i].mehrwertsteuer.id) {
-                    idx = i;
-                    break;
-                }
-            }
-
-            // if not found add entry, otherwise sum up
-            if (idx == -1) {
-                arr.push({
-                    mehrwertsteuer: pos[x].produkt.mehrwertsteuer,
-                    anteil: pos[x].mehrwertsteuersumme
-                });
-            } else {
-                arr[idx].anteil += helper.round(pos[x].mehrwertsteuersumme);
-            }
-        }
+        // Formatiere das Datum/Uhrzeit basierend auf der Zeitzone
+        const formatter = new Intl.DateTimeFormat('de-DE', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            timeZone: this._timezone
+        });
         
-        return arr;
+        const parts = formatter.formatToParts(now);
+        let year = '', month = '', day = '', hour = '', minute = '', second = '';
+        
+        parts.forEach(part => {
+            if (part.type === 'year') year = part.value;
+            if (part.type === 'month') month = part.value;
+            if (part.type === 'day') day = part.value;
+            if (part.type === 'hour') hour = part.value;
+            if (part.type === 'minute') minute = part.value;
+            if (part.type === 'second') second = part.value;
+        });
+        
+        const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+        return `${year}${month}${day}-${hour}${minute}${second}-${randomSuffix}`;
+    }
+
+    /**
+     * Erstellt eine neue Bestellung mit allen Bestellpositionen
+     * @param {Object} kunde - Kundendaten (name, street, zip, city, email, phone)
+     * @param {Array} items - Array von Bestellitems mit Komponenten
+     * @param {String} orderNote - Anmerkung zur Bestellung
+     * @param {Boolean} asap - Schnellstmögliche Lieferung?
+     * @param {String} deliveryDateTime - Liefertermin (ISO 8601)
+     * @param {Number} net - Nettosumme
+     * @param {Number} shipping - Versandkosten
+     * @param {Number} vat - MwSt-Betrag
+     * @param {Number} total - Gesamtsumme
+     * @returns {Object} {orderId, configIds}
+     */
+    createOrder(kunde, items, orderNote, asap, deliveryDateTime, net, shipping, vat, total) {
+        // Validierungen
+        if (!kunde || !kunde.name || !kunde.email) {
+            throw new Error('Kundendaten sind unvollständig');
+        }
+
+        if (!Array.isArray(items) || items.length === 0) {
+            throw new Error('Keine Artikel in der Bestellung');
+        }
+
+        // Berechne Lieferzeitpunkt basierend auf asap-Flag
+        let lieferzeitpunkt = null;
+        if (asap) {
+            lieferzeitpunkt = 'Schnellstmögliche Lieferung';
+        } else if (deliveryDateTime) {
+            const dt = new Date(deliveryDateTime);
+            lieferzeitpunkt = dt.toLocaleString('de-DE', { timeZone: this._timezone });
+        }
+
+        // Generiere eine eindeutige Bestellnummer
+        const bestellnummer = this.generateBestellnummer();
+
+        // Formatiere das aktuelle Datum/Uhrzeit mit der konfigurierten Zeitzone
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('de-DE', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false,
+            timeZone: this._timezone
+        });
+        
+        const parts = formatter.formatToParts(now);
+        let year = '', month = '', day = '', hour = '', minute = '', second = '';
+        
+        parts.forEach(part => {
+            if (part.type === 'year') year = part.value;
+            if (part.type === 'month') month = part.value;
+            if (part.type === 'day') day = part.value;
+            if (part.type === 'hour') hour = part.value;
+            if (part.type === 'minute') minute = part.value;
+            if (part.type === 'second') second = part.value;
+        });
+        
+        const erstellt_am = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+
+        // Erstelle die Bestellung
+        const bestellungSql = `
+            INSERT INTO Bestellung (
+                bestellnummer,
+                erstellt_am,
+                kunde_name,
+                kunde_strasse,
+                kunde_plz,
+                kunde_stadt,
+                kunde_email,
+                kunde_telefon,
+                netto_preis,
+                lieferkosten,
+                mwst_betrag,
+                brutto_betrag,
+                lieferzeitpunkt,
+                bemerkung
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `;
+
+        const bestellungStatement = this._conn.prepare(bestellungSql);
+        const bestellungResult = bestellungStatement.run([
+            bestellnummer,
+            erstellt_am,
+            kunde.name,
+            kunde.street,
+            kunde.zip,
+            kunde.city,
+            kunde.email,
+            kunde.phone || null,
+            Number(net),
+            Number(shipping),
+            Number(vat),
+            Number(total),
+            lieferzeitpunkt,
+            orderNote || null
+        ]);
+
+        if (bestellungResult.changes !== 1) {
+            throw new Error('Die Bestellung konnte nicht angelegt werden');
+        }
+
+        const orderId = bestellungResult.lastInsertRowid;
+        const configIds = [];
+
+        // Erstelle Bestellpositionen für jedes Item
+        items.forEach((item, posIndex) => {
+            if (!item.components) {
+                throw new Error(`Item ${posIndex + 1}: Komponenten fehlen`);
+            }
+
+            const components = item.components;
+
+            // Validiere erforderliche Komponenten
+            if (!components.sizeId || !components.doughId || !components.sauceId) {
+                throw new Error(
+                    `Item ${posIndex + 1}: Ungültige Pizza-Konfiguration - Größe, Teig oder Soße fehlt`
+                );
+            }
+
+            // Erstelle JSON-Repräsentation der Konfiguration
+            const configJson = JSON.stringify({
+                sizeId: components.sizeId,
+                doughId: components.doughId,
+                sauceId: components.sauceId,
+                cheeses: components.cheeses || [],
+                toppings: components.toppings || [],
+                note: components.note || '',
+                qty: item.qty,
+                displayText: item.text
+            });
+
+            // Speichere die Konfiguration
+            const konfigurationSql = `
+                INSERT INTO Konfiguration (
+                    konfiguration_json,
+                    bezeichnung,
+                    netto_preis
+                ) VALUES (?, ?, ?)
+            `;
+
+            const konfigurationStatement = this._conn.prepare(konfigurationSql);
+            const perPizzaPrice = item.total / item.qty;
+
+            const konfigurationResult = konfigurationStatement.run([
+                configJson,
+                item.text || 'Individuelle Pizza',
+                Number(perPizzaPrice)
+            ]);
+
+            if (konfigurationResult.changes !== 1) {
+                throw new Error(`Item ${posIndex + 1}: Konfiguration konnte nicht gespeichert werden`);
+            }
+
+            configIds.push(konfigurationResult.lastInsertRowid);
+
+            // Erstelle Bestellposition
+            const positionSql = `
+                INSERT INTO Bestellposition (
+                    bestellung_id,
+                    positionsnummer,
+                    konfiguration_id,
+                    config_json,
+                    netto_einzelpreis,
+                    menge,
+                    netto_gesamtpreis,
+                    notizen
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            `;
+
+            const positionStatement = this._conn.prepare(positionSql);
+            positionStatement.run([
+                orderId,
+                posIndex + 1,
+                konfigurationResult.lastInsertRowid,
+                configJson,
+                Number(perPizzaPrice),
+                item.qty,
+                Number(item.total),
+                components.note || null
+            ]);
+        });
+
+        return {
+            orderId,
+            bestellnummer,
+            configIds
+        };
+    }
+
+    /**
+     * Lädt eine Bestellung mit ihren Positionen
+     * @param {Number} orderId - Bestellungs-ID
+     * @returns {Object} Bestellung mit Positionen
+     */
+    getOrderById(orderId) {
+        const sql = `
+            SELECT * FROM Bestellung WHERE id = ?
+        `;
+
+        const statement = this._conn.prepare(sql);
+        const order = statement.get([orderId]);
+
+        if (!order) {
+            return null;
+        }
+
+        // Lade auch die Positionen
+        const positionSql = `
+            SELECT * FROM Bestellposition WHERE bestellung_id = ? ORDER BY positionsnummer
+        `;
+
+        const positionStatement = this._conn.prepare(positionSql);
+        const positions = positionStatement.all([orderId]);
+
+        return {
+            ...order,
+            positionen: positions || []
+        };
+    }
+
+    /**
+     * Lädt alle Bestellungen eines Kunden
+     * @param {String} email - E-Mail des Kunden
+     * @returns {Array} Array von Bestellungen
+     */
+    getOrdersByCustomerEmail(email) {
+        const sql = `
+            SELECT * FROM Bestellung WHERE kunde_email = ? ORDER BY erstellt_am DESC
+        `;
+
+        const statement = this._conn.prepare(sql);
+        const orders = statement.all([email]);
+
+        return helper.isArrayEmpty(orders) ? [] : orders;
+    }
+
+    /**
+     * Aktualisiert den Status einer Bestellung
+     * @param {Number} orderId - Bestellungs-ID
+     * @param {String} status - Neuer Status
+     */
+    updateOrderStatus(orderId, status) {
+        const sql = `
+            UPDATE Bestellung SET bemerkung = ? WHERE id = ?
+        `;
+
+        const statement = this._conn.prepare(sql);
+        const result = statement.run([status, orderId]);
+
+        return result.changes === 1;
     }
 
     toString() {
