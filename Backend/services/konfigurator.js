@@ -95,4 +95,25 @@ serviceRouter.get('/konfigurator/belag', function(request, response) {
     }
 });
 
+// Neue Konfiguration anlegen
+serviceRouter.post('/konfigurator/konfiguration', function(request, response) {
+    console.log('Service Konfigurator: Client requested to create a configuration');
+
+    const body = request.body || {};
+    const bezeichnung = body.bezeichnung;
+    const beschreibung = body.beschreibung;
+    const konfigurationJson = body.konfiguration || body.konfiguration_json;
+    const nettoPreis = body.netto_preis;
+
+    const konfiguratorDao = new KonfiguratorDao(request.app.locals.dbConnection);
+    try {
+        const obj = konfiguratorDao.createKonfiguration(konfigurationJson, bezeichnung, beschreibung, nettoPreis);
+        console.log('Service Konfigurator: Configuration created with id=' + obj.id);
+        response.status(201).json(obj);
+    } catch (ex) {
+        console.error('Service Konfigurator: Error creating configuration. Exception occured: ' + ex.message);
+        response.status(400).json({ 'fehler': true, 'nachricht': ex.message });
+    }
+});
+
 module.exports = serviceRouter;

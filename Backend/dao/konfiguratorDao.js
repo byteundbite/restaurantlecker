@@ -81,6 +81,42 @@ class KonfiguratorDao {
         };
     }
 
+    // Legt eine neue Konfiguration an
+    createKonfiguration(konfigurationJson, bezeichnung, beschreibung, netto_preis) {
+        if (helper.isUndefined(konfigurationJson) || helper.isNull(konfigurationJson)) {
+            throw new Error('konfigurationJson fehlt');
+        }
+
+        if (!bezeichnung || typeof bezeichnung !== 'string') {
+            throw new Error('bezeichnung fehlt oder ist ungültig');
+        }
+
+        if (!helper.isNumeric(netto_preis)) {
+            throw new Error('netto_preis fehlt oder ist keine Zahl');
+        }
+
+        const sql = 'INSERT INTO Konfiguration (konfiguration_json, bezeichnung, beschreibung, netto_preis) VALUES (?, ?, ?, ?)';
+        const statement = this._conn.prepare(sql);
+
+        const payloadJson = typeof konfigurationJson === 'string'
+            ? konfigurationJson
+            : JSON.stringify(konfigurationJson);
+
+        const result = statement.run([payloadJson, bezeichnung, beschreibung || null, Number(netto_preis)]);
+
+        if (result.changes !== 1) {
+            throw new Error('Die Konfiguration konnte nicht angelegt werden');
+        }
+
+        return {
+            id: result.lastInsertRowid,
+            konfiguration_json: payloadJson,
+            bezeichnung,
+            beschreibung: beschreibung || null,
+            netto_preis: Number(netto_preis)
+        };
+    }
+
     toString() {
         console.log('KonfiguratorDao [_conn=' + this._conn + ']');
     }
