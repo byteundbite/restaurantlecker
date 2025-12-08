@@ -44,9 +44,7 @@
         <div class="form-row">
           <label for="size">Größe</label>
           <select id="size" aria-label="Größe wählen">
-            <option value="26">Klein, 26cm</option>
-            <option value="30" selected>Mittel, 30cm</option>
-            <option value="36">Groß, 36cm</option>
+            <option disabled selected>Wird geladen …</option>
           </select>
         </div>
 
@@ -54,9 +52,7 @@
         <div class="form-row">
           <label for="dough">Teig</label>
           <select id="dough" aria-label="Teig wählen">
-            <option value="american">Amerikanisch – dick &amp; fluffig</option>
-            <option value="italian" selected>Italienisch – dünn &amp; knusprig</option>
-            <option value="glutenfree">Glutenfrei</option>
+            <option disabled selected>Wird geladen …</option>
           </select>
         </div>
 
@@ -64,44 +60,20 @@
         <div class="form-row">
           <label for="sauce">Soße</label>
           <select id="sauce" aria-label="Soße wählen">
-            <option value="tomato" selected>Mediterrane Tomatensoße</option>
-            <option value="white">Weiße Soße mit Crème fraîche</option>
-            <option value="bbq">BBQ-Soße</option>
-            <option value="oilherbs">Olivenöl mit Kräutern</option>
+            <option disabled selected>Wird geladen …</option>
           </select>
         </div>
 
         <!-- Käse -->
         <fieldset class="fieldset">
           <legend>Käse</legend>
-          <label class="chip"><input type="checkbox" class="cheese" value="mozzarella" checked /> Mozzarella</label>
-          <label class="chip"><input type="checkbox" class="cheese" value="cheddar" /> Cheddar</label>
-          <label class="chip"><input type="checkbox" class="cheese" value="goat" /> Ziegenkäse</label>
+          <div id="cheese-options" class="chips"></div>
         </fieldset>
 
         <!-- Beläge -->
         <fieldset class="fieldset">
           <legend>Beläge</legend>
-
-          <h3 class="subtle">Nicht-vegetarisch</h3>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" class="topping" value="salami" /> Salami</label>
-            <label class="chip"><input type="checkbox" class="topping" value="ham" /> Hinterschinken</label>
-            <label class="chip"><input type="checkbox" class="topping" value="parma" /> Parmaschinken</label>
-            <label class="chip"><input type="checkbox" class="topping" value="chicken" /> Hähnchen</label>
-          </div>
-
-          <h3 class="subtle">Vegetarisch</h3>
-          <div class="chips">
-            <label class="chip"><input type="checkbox" class="topping" value="porcini" /> Steinpilze</label>
-            <label class="chip"><input type="checkbox" class="topping" value="paprika" /> Paprika</label>
-            <label class="chip"><input type="checkbox" class="topping" value="onion" /> Zwiebeln</label>
-            <label class="chip"><input type="checkbox" class="topping" value="olives" /> Oliven</label>
-            <label class="chip"><input type="checkbox" class="topping" value="rucola" /> Rucola</label>
-            <label class="chip"><input type="checkbox" class="topping" value="peperoni" /> Peperoni</label>
-            <label class="chip"><input type="checkbox" class="topping" value="corn" /> Mais</label>
-            <label class="chip"><input type="checkbox" class="topping" value="mushrooms" /> Champignons</label>
-          </div>
+          <div id="topping-groups"></div>
         </fieldset>
 
         <!-- Anzahl & Anmerkung -->
@@ -118,7 +90,7 @@
         <!-- Preisleiste + CTA. Hinweis: Preisberechnung erfolgt live in script.js -->
         <div class="pricebar">
           <div>Zwischensumme: <strong id="price">–</strong></div>
-          <button id="add-to-cart" class="btn-primary">Weiter</button>
+          <button id="add-to-cart" class="btn-primary">Zum Warenkorb hinzufügen</button>
         </div>
       </div>
 

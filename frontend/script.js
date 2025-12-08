@@ -204,6 +204,255 @@ function initContactForm() {
  ****************************************************/
 const API_BASE = 'http://localhost:8000';
 
+/****************************************************
+ * 2a. Konfigurator: Komponenten laden & anzeigen
+ ****************************************************/
+async function fetchConfiguratorComponents() {
+    const url = `${API_BASE}/api/konfigurator/komponenten`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!res.ok || data.fehler) {
+        throw new Error(data.nachricht || 'Komponenten konnten nicht geladen werden');
+    }
+
+    return data;
+}
+
+function formatName(label) {
+    if (!label) return '';
+    return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function formatWithPrice(label, price) {
+    const suffix = price > 0 ? ` (+${euro(price)})` : ' (inkl.)';
+    return `${formatName(label)}${suffix}`;
+}
+
+function renderSelectOptions(selectId, items) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+
+    select.innerHTML = '';
+
+    items.forEach((item, index) => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.dataset.price = item.preis;
+        opt.textContent = item.beschreibung
+            ? `${item.beschreibung} (${formatName(item.bezeichnung)})${item.preis ? ` · +${euro(item.preis)}` : ''}`
+            : formatWithPrice(item.bezeichnung, item.preis);
+        if (index === 0) opt.selected = true;
+        select.appendChild(opt);
+    });
+}
+
+function renderCheeseOptions(cheeses) {
+    const container = document.getElementById('cheese-options');
+    if (!container) return;
+
+    container.innerHTML = '';
+    if (!cheeses || cheeses.length === 0) {
+        container.textContent = 'Keine Käsesorten verfügbar.';
+        return;
+    }
+
+    cheeses.forEach((c, idx) => {
+        const label = document.createElement('label');
+        label.className = 'chip';
+
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.className = 'cheese';
+        input.value = c.id;
+        input.dataset.price = c.preis;
+        if (idx === 0) input.checked = true;
+
+        label.appendChild(input);
+        label.appendChild(document.createTextNode(' ' + formatWithPrice(c.bezeichnung, c.preis)));
+        container.appendChild(label);
+    });
+}
+
+function renderToppingGroups(toppings) {
+    const container = document.getElementById('topping-groups');
+    if (!container) return;
+
+    container.innerHTML = '';
+    if (!toppings || toppings.length === 0) {
+        container.textContent = 'Keine Beläge verfügbar.';
+        return;
+    }
+
+    const meatSea = [];
+    const veggie = [];
+
+    toppings.forEach(t => {
+        const cat = (t.kategorie || '').toLowerCase();
+        if (cat === 'gemuese') {
+            veggie.push(t);
+        } else {
+            meatSea.push(t);
+        }
+    });
+
+    const addGroup = (title, list) => {
+        if (!list.length) return;
+        const groupWrapper = document.createElement('div');
+        const headline = document.createElement('h3');
+        headline.className = 'subtle';
+        headline.textContent = title;
+
+        const chips = document.createElement('div');
+        chips.className = 'chips';
+
+        list.forEach(t => {
+            const label = document.createElement('label');
+            label.className = 'chip';
+
+            const input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'topping';
+            input.value = t.id;
+            input.dataset.price = t.preis;
+
+            label.appendChild(input);
+            label.appendChild(document.createTextNode(' ' + formatWithPrice(t.bezeichnung, t.preis)));
+            chips.appendChild(label);
+        });
+
+        groupWrapper.appendChild(headline);
+        groupWrapper.appendChild(chips);
+        container.appendChild(groupWrapper);
+    };
+
+    addGroup('Fleisch & Meeresfrüchte', meatSea);
+    addGroup('Vegetarisch', veggie);
+}
+
+function getComponentById(list, id) {
+    return list.find(item => String(item.id) === String(id));
+}
+
+function calculateConfiguratorNet() {
+    if (!STATE.configComponents) return 0;
+
+    const sizeSel = document.getElementById('size');
+    const doughSel = document.getElementById('dough');
+    const sauceSel = document.getElementById('sauce');
+
+    const size = getComponentById(STATE.configComponents.groessen, sizeSel?.value);
+    const dough = getComponentById(STATE.configComponents.teig, doughSel?.value);
+    const sauce = getComponentById(STATE.configComponents.sosse, sauceSel?.value);
+
+    let total = 0;
+    total += size ? Number(size.preis) : 0;
+    total += dough ? Number(dough.preis) : 0;
+    total += sauce ? Number(sauce.preis) : 0;
+
+    document.querySelectorAll('#cheese-options input.cheese:checked').forEach(el => {
+        total += Number(el.dataset.price || 0);
+    });
+
+    document.querySelectorAll('#topping-groups input.topping:checked').forEach(el => {
+        total += Number(el.dataset.price || 0);
+    });
+
+    return total;
+}
+
+function updateConfiguratorPrice() {
+    const priceEl = document.getElementById('price');
+    if (!priceEl) return;
+
+    const qtyInput = document.getElementById('qty');
+    const qty = Math.max(1, parseInt(qtyInput?.value || '1', 10));
+    const perPizza = calculateConfiguratorNet();
+    const total = perPizza * qty;
+
+    if (qtyInput) qtyInput.value = qty;
+    priceEl.textContent = euro(total);
+}
+
+function buildConfiguratorSummary() {
+    if (!STATE.configComponents) return '';
+    const size = getComponentById(STATE.configComponents.groessen, document.getElementById('size')?.value);
+    const dough = getComponentById(STATE.configComponents.teig, document.getElementById('dough')?.value);
+    const sauce = getComponentById(STATE.configComponents.sosse, document.getElementById('sauce')?.value);
+    const cheeses = Array.from(document.querySelectorAll('#cheese-options input.cheese:checked')).map(el => getComponentById(STATE.configComponents.kaese, el.value)?.bezeichnung || el.value);
+    const toppings = Array.from(document.querySelectorAll('#topping-groups input.topping:checked')).map(el => getComponentById(STATE.configComponents.belag, el.value)?.bezeichnung || el.value);
+    const note = document.getElementById('note')?.value.trim();
+
+    const parts = [
+        size ? `Größe: ${formatName(size.bezeichnung)}` : null,
+        dough ? `Teig: ${formatName(dough.bezeichnung)}` : null,
+        sauce ? `Soße: ${formatName(sauce.bezeichnung)}` : null,
+        cheeses.length ? `Käse: ${cheeses.map(formatName).join(', ')}` : null,
+        toppings.length ? `Beläge: ${toppings.map(formatName).join(', ')}` : null,
+        note ? `Notiz: ${note}` : null
+    ].filter(Boolean);
+
+    return parts.join(' | ');
+}
+
+async function initConfiguratorPage() {
+    const addBtn = document.getElementById('add-to-cart');
+    if (!addBtn) return; // wir sind nicht auf configurator.html
+
+    const priceEl = document.getElementById('price');
+
+    try {
+        const components = await fetchConfiguratorComponents();
+        STATE.configComponents = components;
+
+        renderSelectOptions('size', components.groessen || []);
+        renderSelectOptions('dough', components.teig || []);
+        renderSelectOptions('sauce', components.sosse || []);
+        renderCheeseOptions(components.kaese || []);
+        renderToppingGroups(components.belag || []);
+
+        ['size', 'dough', 'sauce', 'qty'].forEach(id => {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.addEventListener('change', updateConfiguratorPrice);
+            el.addEventListener('input', updateConfiguratorPrice);
+        });
+
+        document.getElementById('cheese-options')?.addEventListener('change', updateConfiguratorPrice);
+        document.getElementById('topping-groups')?.addEventListener('change', updateConfiguratorPrice);
+
+        addBtn.addEventListener('click', () => {
+            const qty = Math.max(1, parseInt(document.getElementById('qty')?.value || '1', 10));
+            const perPizza = calculateConfiguratorNet();
+            const total = perPizza * qty;
+            const summary = buildConfiguratorSummary();
+
+            const hasSelection = document.getElementById('size')?.value && document.getElementById('dough')?.value && document.getElementById('sauce')?.value;
+            if (!hasSelection) {
+                alert('Bitte wähle zunächst deine Komponenten.');
+                return;
+            }
+
+            CART.push({ text: summary || 'Individuelle Pizza', qty, total });
+            saveCart();
+            renderMiniCart();
+            // Auf der Konfiguratorseite bleiben; Mini-Warenkorb aktualisieren
+        });
+
+        updateConfiguratorPrice();
+    } catch (err) {
+        console.error('Konfigurator konnte nicht initialisiert werden:', err);
+        if (priceEl) priceEl.textContent = 'Fehler';
+        const noteEl = document.querySelector('.configurator');
+        if (noteEl) {
+            const msg = document.createElement('p');
+            msg.className = 'error';
+            msg.textContent = 'Konfigurator-Daten konnten nicht geladen werden. Bitte versuchen Sie es später erneut.';
+            noteEl.prepend(msg);
+        }
+    }
+}
+
 async function getDailyPizzaFromDB() {
     try {
         const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
@@ -625,6 +874,7 @@ function renderThankyouSummary() {
  ****************************************************/
 window.addEventListener("DOMContentLoaded", () => {
     initApp();
+    initConfiguratorPage();
     renderCartPage();
     protectCheckoutWhenCartEmpty();
     initCheckoutDatetimeLogic();
