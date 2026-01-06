@@ -136,6 +136,10 @@ html, body{
     .grid-2{ grid-template-columns: 1fr; }
 }
 
+/* Spalten auf der Startseite */
+.left-column { display: flex; flex-direction: column; gap: var(--space-3); }
+.right-column { display: flex; flex-direction: column; gap: var(--space-3); }
+
 /* ========== 8) Listen / Checklisten ========== */
 .checklist{ list-style:none; padding:0; }
 .checklist li{

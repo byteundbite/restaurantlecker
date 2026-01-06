@@ -444,6 +444,27 @@ async function initConfiguratorPage() {
     const addBtn = document.getElementById('add-to-cart');
     if (!addBtn) return; // wir sind nicht auf configurator.html
 
+    function resetConfiguratorForm() {
+        ['size', 'dough', 'sauce'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el && el.options.length) {
+                el.selectedIndex = 0;
+            }
+        });
+
+        document.querySelectorAll('#cheese-options input.cheese, #topping-groups input.topping').forEach(cb => {
+            cb.checked = false;
+        });
+
+        const qtyInput = document.getElementById('qty');
+        if (qtyInput) qtyInput.value = 1;
+
+        const noteEl = document.getElementById('note');
+        if (noteEl) noteEl.value = '';
+
+        updateConfiguratorPrice();
+    }
+
     function addCurrentSelectionToCart(options = {}) {
         const qtyInput = document.getElementById('qty');
         const qty = Math.max(1, parseInt((options.qtyOverride ?? qtyInput?.value) || '1', 10));
@@ -504,6 +525,10 @@ async function initConfiguratorPage() {
         }
         saveCart();
         renderMiniCart();
+
+        if (options.reset !== false) {
+            resetConfiguratorForm();
+        }
         return true;
     }
 
@@ -561,7 +586,8 @@ async function initConfiguratorPage() {
         const added = addCurrentSelectionToCart({
             labelOverride: label,
             qtyOverride: pending.qty || 1,
-            showAlert: false
+            showAlert: false,
+            reset: false
         });
 
         if (added) {
@@ -596,7 +622,6 @@ async function initConfiguratorPage() {
         });
 
         updateConfiguratorPrice();
-        applyPendingPresetOnConfigurator();
     } catch (err) {
         console.error('Konfigurator konnte nicht initialisiert werden:', err);
         if (priceEl) priceEl.textContent = 'Fehler';
@@ -718,29 +743,124 @@ function parseRecommendationConfig(raw) {
     }
 }
 
+async function loadConfiguratorComponentsIfNeeded() {
+    if (STATE.configComponents) return STATE.configComponents;
+    try {
+        const components = await fetchConfiguratorComponents();
+        STATE.configComponents = components;
+        return components;
+    } catch (err) {
+        console.error('Komponenten konnten nicht geladen werden:', err);
+        return null;
+    }
+}
+
+function buildSummaryFromConfig(config, components) {
+    if (!config || !components) return '';
+
+    const getComponentName = (list, id) => {
+        const item = (list || []).find(x => String(x.id) === String(id));
+        return item ? formatName(item.bezeichnung) : '';
+    };
+
+    const size = getComponentName(components.groessen, config.groesse);
+    const dough = getComponentName(components.teig, config.teig);
+    const sauce = getComponentName(components.sosse, config.sosse);
+
+    const cheeseIds = Array.isArray(config.kaese) ? config.kaese : (config.kaese || config.kaese === 0 ? [config.kaese] : []);
+    const cheeses = cheeseIds.map(id => getComponentName(components.kaese, id)).filter(Boolean);
+
+    const toppingIds = config.belaege || [];
+    const toppings = toppingIds.map(id => getComponentName(components.belag, id)).filter(Boolean);
+
+    const parts = [
+        size ? `Größe: ${size}` : null,
+        dough ? `Teig: ${dough}` : null,
+        sauce ? `Soße: ${sauce}` : null,
+        cheeses.length ? `Käse: ${cheeses.join(', ')}` : null,
+        toppings.length ? `Beläge: ${toppings.join(', ')}` : null
+    ].filter(Boolean);
+
+    return parts.join(' | ');
+}
+
+async function addRecommendationToCart(preset) {
+    if (!preset || !preset.config) return false;
+
+    const config = preset.config;
+    const label = preset.title || 'Empfehlung';
+
+    let components = STATE.configComponents;
+    if (!components) {
+        components = await loadConfiguratorComponentsIfNeeded();
+    }
+
+    let summary = '';
+    if (components) {
+        summary = buildSummaryFromConfig(config, components);
+    }
+
+    const textLabel = summary ? `${label} – ${summary}` : label;
+
+    const cheeseIds = Array.isArray(config.kaese) ? config.kaese : (config.kaese || config.kaese === 0 ? [config.kaese] : []);
+    const toppingIds = config.belaege || [];
+
+    const cheeses = cheeseIds.map(id => ({
+        id,
+        bezeichnung: `Käse ${id}`
+    }));
+
+    const toppings = toppingIds.map(id => ({
+        id,
+        bezeichnung: `Belag ${id}`
+    }));
+
+    const grossTotal = preset.netPrice * 1.19;
+
+    const newItem = {
+        text: textLabel,
+        qty: 1,
+        total: grossTotal,
+        components: {
+            sizeId: config.groesse,
+            doughId: config.teig,
+            sauceId: config.sosse,
+            cheeses,
+            toppings,
+            note: ''
+        }
+    };
+
+    const existing = CART.find(item => componentsEqual(item.components, newItem.components));
+    if (existing) {
+        existing.qty += 1;
+        existing.total += grossTotal;
+    } else {
+        CART.push(newItem);
+    }
+    
+    saveCart();
+    renderMiniCart();
+
+    window.location.href = 'configurator.html';
+    return true;
+}
+
 function bindRecommendationCard(cardId, preset) {
     if (!preset || !preset.config) return;
     const card = document.getElementById(cardId);
     if (!card) return;
 
-    const navigate = (evt) => {
+    const addToCart = (evt) => {
         if (evt) evt.preventDefault();
-        persistPendingPreset({
-            title: preset.title,
-            description: preset.description,
-            netPrice: preset.netPrice,
-            config: preset.config,
-            source: preset.source,
-            qty: 1
-        });
-        window.location.href = 'configurator.html';
+        addRecommendationToCart(preset);
     };
 
-    card.addEventListener('click', navigate);
+    card.addEventListener('click', addToCart);
     card.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            navigate();
+            addToCart();
         }
     });
 }

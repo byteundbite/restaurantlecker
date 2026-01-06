@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Startseite</title>
+  <link rel="icon" type="image/png" href="img/logo_mit_hintergrund_kreisfoermig.png" />
   <link rel="stylesheet" href="style.css" />
   <script src="script.js" defer></script>
 </head>
@@ -34,41 +35,46 @@
 
   <!-- Hauptinhalt: Startseite -->
   <main class="site-main container">
+    <div class="grid-2">
+      <!-- Linke Spalte (2/3) -->
+      <div class="left-column">
+        <!-- Begrüßung -->
+        <section class="card">
+          <h2>Willkommen bei Lecker</h2>
+          <p>
+            Schön, dass Sie da sind! Bei <strong>Lecker</strong> dreht sich alles um Pizza – frisch, individuell
+            konfigurierbar und mit viel Liebe zubereitet. Wählen Sie aus hochwertigen Zutaten und <a href="configurator.html">stellen Sie Ihre Wunschpizza zusammen</a>.
+          </p>
+        </section>
 
-    <!-- Begrüßung -->
-    <section class="card">
-      <h2>Willkommen bei Lecker</h2>
-      <p>
-        Schön, dass Sie da sind! Bei <strong>Lecker</strong> dreht sich alles um Pizza – frisch, individuell
-        konfigurierbar und mit viel Liebe zubereitet. Wählen Sie aus hochwertigen Zutaten und stellen Sie Ihre Wunschpizza
-        zusammen.
-      </p>
-    </section>
+        <!-- Vorteile  -->
+        <section class="card">
+          <h2>Gründe, warum Sie unsere Pizza lieben werden</h2>
+          <ul class="checklist">
+            <li>Frische, regionale Zutaten</li>
+            <li>Knuspriger Teig – nach Ihrer Lieblingsart</li>
+            <li>Individuelle Konfiguration und faire Preise</li>
+            <li>Schnelle Zubereitung und freundlicher Service</li>
+            <li>Vegetarische und glutenfreie Optionen</li>
+          </ul>
+        </section>
+      </div>
 
-    <!-- Vorteile  -->
-    <section class="card">
-      <h2>Gründe, warum Sie unsere Pizza lieben werden</h2>
-      <ul class="checklist">
-        <li>Frische, regionale Zutaten</li>
-        <li>Knuspriger Teig – nach Ihrer Lieblingsart</li>
-        <li>Individuelle Konfiguration und faire Preise</li>
-        <li>Schnelle Zubereitung und freundlicher Service</li>
-        <li>Vegetarische und glutenfreie Optionen</li>
-      </ul>
-    </section>
-
-    <!-- Pizza des Tages -->
-    <section class="card center" id="daily-card">
-      <h2>Pizza des Tages</h2>
-      <p id="daily-special" class="accent">Wird geladen …</p>
-      <p class="muted">Tipp: In <a href="configurator.html">Pizza zusammenstellen</a> können Sie Ihre Wunschpizza erstellen.</p>
-    </section>
-    
-    <!-- Saisonale Bestseller-Pizza -->
-    <section class="card center" id="season-card">
-      <h2>Beliebteste Pizza der Saison</h2>
-      <p id="seasonal-special" class="accent">Wird geladen …</p>
-    </section>
+      <!-- Rechte Spalte (1/3) -->
+      <div class="right-column">
+        <!-- Pizza des Tages -->
+        <section class="card center" id="daily-card">
+          <h2>Pizza des Tages</h2>
+          <p id="daily-special" class="accent">Wird geladen …</p>
+        </section>
+        
+        <!-- Saisonale Bestseller-Pizza -->
+        <section class="card center" id="season-card">
+          <h2>Beliebteste Pizza der Saison</h2>
+          <p id="seasonal-special" class="accent">Wird geladen …</p>
+        </section>
+      </div>
+    </div>
   </main>
 
   <!-- Footer -->
