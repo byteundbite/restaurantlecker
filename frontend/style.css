@@ -98,6 +98,28 @@ html, body{
     box-shadow: var(--shadow);
     margin-bottom: var(--space-3);
 }
+.clickable-card{
+    cursor:pointer;
+    transition: transform .15s ease, box-shadow .15s ease;
+}
+.clickable-card:focus,
+.clickable-card:hover{
+    box-shadow: 0 10px 20px rgba(0,0,0,.12);
+    transform: translateY(-2px);
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+}
+.recommendation-link{
+    color: var(--color-brand);
+    font-weight: 700;
+    text-decoration: underline;
+}
+.recommendation-link:hover,
+.recommendation-link:focus{
+    text-decoration: none;
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+}
 .center{ text-align:center; }
 .muted{ color: var(--color-muted); }
 .accent{ font-weight:700; }
