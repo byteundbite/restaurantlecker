@@ -4,7 +4,7 @@ Eine Full-Stack-Webanwendung für die Konfiguration und Bestellung von Pizzas mi
 
 **Entwickelt von:** Maximilian Svabensky, Thomas Scharkowski, Jan Umblia  
 **Stack:** Node.js (Express) Backend, vanilla HTML/CSS/JavaScript Frontend, SQLite Datenbank  
-**Version:** 4.0
+**Version:** 4.0 – Backend Version 4.5.0
 
 ---
 
@@ -35,7 +35,7 @@ npm install
 npm start
 ```
 
-Das Backend läuft dann unter `http://localhost:8000` und dient gleichzeitig die Frontend-Dateien.
+Das Backend läuft dann unter `http://localhost:8000` und serviert gleichzeitig die Frontend-Dateien.
 
 ### Entwicklung mit automatischem Reload
 
@@ -43,7 +43,7 @@ Das Backend läuft dann unter `http://localhost:8000` und dient gleichzeitig die
 npm run dev
 ```
 
-Dies verwendet `nodemon` zur Überwachung von Dateieänderungen.
+Dies verwendet `nodemon` zur Überwachung von Dateiänderungen.
 
 ---
 
@@ -68,9 +68,9 @@ restaurantlecker/
 │   └── dao/                       # Data Access Objects (DB-Abfragen)
 │       ├── konfiguratorDao.js     # Pizza-Komponenten laden
 │       ├── bestellungDao.js       # Bestellungen & Positionen speichern
-│       ├── kontaktDao.js
-│       ├── tagespizzaDao.js
-│       └── saisonpizzaDao.js
+│       ├── kontaktDao.js          # Kontaktanfragen verwalten
+│       ├── tagespizzaDao.js       # Tages-Pizzas verwalten
+│       └── saisonpizzaDao.js      # Saisonpizzas verwalten
 ├── frontend/
 │   ├── index.html                 # Startseite (Tages- & Saisonpizza)
 │   ├── configurator.html          # Pizza-Konfigurator
@@ -95,7 +95,7 @@ restaurantlecker/
 Die `server.js` ist der Einstiegspunkt und konfiguriert:
 
 - **Express-Middleware**: CORS, Body Parser, File Upload, Morgan Logging
-- **Statische Dateien**: Dient Frontend-Dateien aus dem `frontend/` Ordner
+- **Statische Dateien**: Serviert Frontend-Dateien aus dem `frontend/` Ordner
 - **Datenbank**: SQLite Verbindung zur `byteundbite.sqlite`
 - **Service-Router**: Bindet alle Services unter dem Prefix `/api/` ein
 - **Zeitzone**: Zentrale `TIMEZONE`-Konstante (`'Europe/Berlin'`) für alle Timestamps
@@ -106,23 +106,22 @@ Die Datenbank-Verbindung und Zeitzone werden in `app.locals` gespeichert und sin
 
 ### Hilfsfunktionen (`helper.js`)
 
-Entält Utility-Funktionen für:
+Enthält Utility-Funktionen für:
 - Typ-Prüfungen (`isUndefined`, `isNull`, `isNumeric`, `isArray`, `isObject`)
 - String-Validierungen (`isEmail`, `isPhoneNumber`, etc.)
+
 ### DAOs (Data Access Objects)
 
 **Datenzugriff-Klassen** für strukturierten DB-Zugriff über prepared statements:
 
 | DAO | Tabelle(n) | Hauptmethoden |
 |-----|-----------|---------------|
-| `KonfiguratorDao` | Groesse, Teig, Sosse, Belag, Kaese, Konfiguration | `loadAllGroessen()`, `loadAllTeig()`, `loadAllSosse()`, `createKonfiguration()` |
+| `KonfiguratorDao` | Groesse, Teig, Sosse, Belag, Kaese, Konfiguration | `loadAllGroessen()`, `loadAllTeig()`, `loadAllSosse()`, `loadAllBelag()`, `loadAllKaese()`, `createKonfiguration()` |
 | `BestellungDao` | Bestellung, Bestellposition, Konfiguration | `createOrder()`, `getOrderById()`, `getOrdersByCustomerEmail()`, `generateBestellnummer()` |
-| `TagespizzaDao` | TagespizzaDef | `loadAll()`, `loadById()`, `create()`, `update()` |
-| `SaisonpizzaDao` | SaisonpizzaDef | `loadAll()`, `loadById()`, `create()`, `update()` |
-| `KontaktDao` | Kontakt | `loadAll()`, `create()` |aese | `loadAllGroessen()`, `loadAllTeig()`, `loadAllSosse()`, etc. |
-| `TagespizzaDao` | TagespizzaDef | `loadAll()`, `loadById()`, `create()`, `update()` |
-| `SaisonpizzaDao` | SaisonpizzaDef | `loadAll()`, `loadById()`, `create()`, `update()` |
+| `TagespizzaDao` | TagespizzaDef | `loadAll()`, `loadById()`, `create()`, `update()`, `delete()` |
+| `SaisonpizzaDao` | SaisonpizzaDef | `loadAll()`, `loadById()`, `create()`, `update()`, `delete()` |
 | `KontaktDao` | Kontakt | `loadAll()`, `create()` |
+
 ### Services (API-Endpoints)
 
 **Express Router** unter `/api/<servicename>/`:
@@ -179,22 +178,10 @@ GET  /api/bestellung/kunde/:email    → Alle Bestellungen eines Kunden
   "net": 25.00,
   "shipping": 2.00,
   "vat": 5.13,
-| Seite | Datei | Backend-Verbindung | Funktion |
-|-------|-------|-------------------|----------|
-| Startseite | `index.html` | `GET /api/konfigurator/komponenten`<br>`GET /api/tagespizza`<br>`GET /api/saisonpizza` | Zeigt Pizza des Tages & Saisonpizza |
-| Konfigurator | `configurator.html` | `GET /api/konfigurator/komponenten` | UI für Pizza-Konfiguration mit Live-Preisberechnung;<br>Speichert Komponenten-IDs im LocalStorage |
-| Kontakt | `contact.html` | `POST /api/kontakt` | Kontaktformular mit Echtzeit-Validierung (E-Mail, Telefon) |
-| Warenkorb | `cart.html` | — | Warenkorb-Übersicht aus LocalStorage;<br>Mengen anpassen, Positionen entfernen |
-| Checkout | `checkout.html` | `POST /api/bestellung` | Kundendaten erfassen & Bestellung absenden;<br>Items mit Komponenten-IDs an Backend |
-| Danke | `thankyou.html` | — | Bestellbestätigung mit Zusammenfassung aus LocalStorage |
-| Über uns | `about.html` | — | Statische Info-Seite |
-| Impressum | `legal.html` | — | Statische Info-Seite |
-  "bestellnummer": "20251208-183045-7842",
-  "configIds": [101, 102]
+  "total": 32.13
 }
 ```
 
-#### `kontakt.js`
 #### `kontakt.js`
 
 ```
@@ -207,7 +194,7 @@ POST /api/kontakt                    → Neue Kontaktanfrage (Anfrage-Validierun
 {
   "name": "Max Mustermann",
   "email": "max@example.com",
-  "phone": "+49 123 456789",  // optional
+  "phone": "+49 123 456789",
   "message": "Ich hätte gerne..."
 }
 ```
@@ -239,11 +226,11 @@ PUT  /api/saisonpizza/:id            → Saisonpizza aktualisieren (Admin)
 | Seite | Datei | Backend-Verbindung | Funktion |
 |-------|-------|-------------------|----------|
 | Startseite | `index.html` | `GET /api/konfigurator/komponenten`<br>`GET /api/tagespizza`<br>`GET /api/saisonpizza` | Zeigt Pizza des Tages & Saisonpizza |
-| Konfigurator | `configurator.html` | `GET /api/konfigurator/komponenten` | UI für Pizza-Konfiguration; Warenkorb lokal (LocalStorage) |
-| Kontakt | `contact.html` | `POST /api/kontakt` | Kontaktformular mit Validierung |
-| Warenkorb | `cart.html` | — | Nur lokale Anzeige (LocalStorage) |
-| Checkout | `checkout.html` | `POST /api/bestellung` | Bestellt Artikel aus LocalStorage |
-| Danke | `thankyou.html` | — | Statische Bestätigungsseite |
+| Konfigurator | `configurator.html` | `GET /api/konfigurator/komponenten` | UI für Pizza-Konfiguration mit Live-Preisberechnung;<br>Speichert Komponenten-IDs im LocalStorage |
+| Kontakt | `contact.html` | `POST /api/kontakt` | Kontaktformular mit Echtzeit-Validierung (E-Mail, Telefon) |
+| Warenkorb | `cart.html` | — | Warenkorb-Übersicht aus LocalStorage;<br>Mengen anpassen, Positionen entfernen |
+| Checkout | `checkout.html` | `POST /api/bestellung` | Kundendaten erfassen & Bestellung absenden;<br>Items mit Komponenten-IDs an Backend |
+| Danke | `thankyou.html` | — | Bestellbestätigung mit Zusammenfassung aus LocalStorage |
 | Über uns | `about.html` | — | Statische Info-Seite |
 | Impressum | `legal.html` | — | Statische Info-Seite |
 
@@ -302,6 +289,21 @@ Erfolgreiche Anfragen:
 ```json
 {
   "fehler": false,
+  "nachricht": "Erfolgreich",
+  "data": { ... }
+}
+```
+
+Fehlerhafte Anfragen:
+```json
+{
+  "fehler": true,
+  "nachricht": "Fehlermeldung"
+}
+```
+
+---
+
 ## Datenbankschema
 
 Die SQLite Datenbank wird automatisch beim Start angelegt. Haupttabellen:
@@ -321,7 +323,7 @@ CREATE TABLE Kaese (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschr
 ```sql
 CREATE TABLE Konfiguration (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  konfiguration_json TEXT NOT NULL,  -- JSON mit sizeId, doughId, sauceId, cheeses, toppings
+  konfiguration_json TEXT NOT NULL,
   bezeichnung TEXT NOT NULL,
   beschreibung TEXT,
   netto_preis REAL NOT NULL
@@ -331,17 +333,19 @@ CREATE TABLE Konfiguration (
 ### Pizza-Vorlagen
 
 ```sql
-CREATE TABLE TagesPizza (id INTEGER PRIMARY KEY, tag TEXT, konfiguration_id INTEGER, FOREIGN KEY(konfiguration_id) REFERENCES Konfiguration(id));
-CREATE TABLE SaisonPizza (id INTEGER PRIMARY KEY, saison TEXT, konfiguration_id INTEGER, FOREIGN KEY(konfiguration_id) REFERENCES Konfiguration(id));
+CREATE TABLE TagespizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
+CREATE TABLE SaisonpizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
 ```
 
-### Bestellungen
+### Kontakte & Bestellungen
 
 ```sql
+CREATE TABLE Kontakt (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, email TEXT, message TEXT, erstellt DATETIME);
+
 CREATE TABLE Bestellung (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  bestellnummer TEXT UNIQUE,           -- Format: YYYYMMDD-HHmmss-XXXX
-  erstellt_am TEXT,                    -- Formatiert mit TIMEZONE
+  bestellnummer TEXT UNIQUE,
+  erstellt_am TEXT,
   kunde_name TEXT NOT NULL,
   kunde_strasse TEXT NOT NULL,
   kunde_plz TEXT NOT NULL,
@@ -361,85 +365,14 @@ CREATE TABLE Bestellposition (
   bestellung_id INTEGER NOT NULL,
   positionsnummer INTEGER NOT NULL,
   konfiguration_id INTEGER,
-  config_json TEXT,                     -- Redundante Speicherung der Komponenten
+  config_json TEXT,
   netto_einzelpreis REAL NOT NULL,
   menge INTEGER NOT NULL,
-  netto_gesamtpreis REAL NOT NULL,
-### Code-Konventionen
-
-- **Deutsch**: Variable, Funktionen, Kommentare sind auf Deutsch
-- **camelCase**: für JS-Variablen & Funktionen
-- **CONST/ALL_CAPS**: für Konstanten (z.B. `TIMEZONE`, `API_BASE`)
-- **Comments**: Block-Kommentare für Abschnitte, Inline-Kommentare für komplexe Logik
-
----
-
-## Weitere Hinweise
-
-### Bestellungsprozess
-
-Der neue Bestellprozess funktioniert wie folgt:
-
-1. **Konfigurator**: Kunde wählt Komponenten (Größe, Teig, Soße, Käse, Beläge)
-2. **LocalStorage**: Pizza wird mit **allen Komponenten-IDs** in den Warenkorb gelegt (nicht nur Text!)
-3. **Checkout**: Kundendaten werden erfasst
-4. **Backend**: `POST /api/bestellung` empfängt:
-   - Kundendaten
-   - Items mit Komponenten (sizeId, doughId, sauceId, cheeses[], toppings[], note)
-5. **Datenbank**: Backend speichert:
-   - **Bestellung** mit auto-generierter Bestellnummer (`YYYYMMDD-HHmmss-XXXX`)
-   - **Konfiguration(en)** als JSON
-   - **Bestellposition(en)** mit Verknüpfung zur Konfiguration
-
-### Zeitzone-Konfiguration
-
-Die Zeitzone wird zentral in `server.js` definiert:
-
-```javascript
-const TIMEZONE = 'Europe/Berlin'; // CET/CEST
-app.locals.timezone = TIMEZONE;
-```
-
-Diese wird verwendet für:
-- **Bestellnummern-Generierung** (Format: `20251208-183045-7842`)
-- **erstellt_am Timestamps** in der Datenbank
-- **Lieferzeitpunkt-Formatierung**
-
-Alle Zeitberechnungen nutzen `Intl.DateTimeFormat` mit der konfigurierten Zeitzone.
-
-### Weitere technische Details
-
-- **Frontend-Build**: Kein Build-Prozess nötig; alle Dateien werden direkt serviert
-- **Datenbank-Init**: Die Tabellen werden beim ersten Server-Start angelegt, wenn sie nicht existieren
-- **Dateistruktur**: Backend und Frontend sind voneinander unabhängig; der Server dient nur statische Dateien
-- **Error-Handling**: Fehler werden geloggt und als JSON-Response gesendet
-- **Warenkorb-Persistenz**: LocalStorage ermöglicht Warenkorb über Browser-Sessions hinweg
-  erstellt_am TEXT
+  netto_gesamtpreis REAL NOT NULL
 );
 ```
 
-Siehe `Backend/db/Create_Table_Statements.sql` für das vollständige Schema.
-CREATE TABLE Groesse (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschreibung TEXT);
-CREATE TABLE Teig (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschreibung TEXT);
-CREATE TABLE Sosse (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschreibung TEXT);
-CREATE TABLE Belag (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschreibung TEXT);
-CREATE TABLE Kaese (id INTEGER PRIMARY KEY, bezeichnung TEXT, preis REAL, beschreibung TEXT);
-```
-
-### Pizza-Vorlagen
-
-```sql
-CREATE TABLE TagespizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
-CREATE TABLE SaisonpizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
-```
-
-### Kontakte & Bestellungen
-
-```sql
-CREATE TABLE Kontakt (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, email TEXT, message TEXT, erstellt DATETIME);
-```
-
-Siehe `Backend/db/Create_Table_Statements.sql` für das vollständige Schema.
+Siehe [Backend/db/Create_Table_Statements.sql](Backend/db/Create_Table_Statements.sql) für das vollständige Schema.
 
 ---
 
@@ -464,7 +397,7 @@ npm test       # Tests ausführen (noch nicht konfiguriert)
 - **md5** (^2.3.0) — MD5-Hashing
 - **lodash** (^4.17.21) — Utility-Library
 - **morgan** (^1.10.0) — HTTP-Request-Logging
-- **jsonwebtoken** (^9.0.2) — JWT für zukünftige Auth
+- **jsonwebtoken** (^9.0.2) — JWT für zukünftige Authentifizierung
 
 ### Debugging
 
@@ -478,22 +411,45 @@ Nutze `npm run dev` und beobachte die Konsole für detailliertes Logging.
 ### Code-Konventionen
 
 - **Deutsch**: Variable, Funktionen, Kommentare sind auf Deutsch
-- **camelCase**: für JS-Variablen & Funktionen
-- **CONST/ALL_CAPS**: selten, werden meist nicht verwendet
+- **camelCase**: für JavaScript-Variablen & Funktionen
+- **CONST/ALL_CAPS**: für Konstanten (z.B. `TIMEZONE`)
 - **Comments**: Block-Kommentare für Abschnitte, Inline-Kommentare für komplexe Logik
 
----
+### Bestellungsprozess
 
-## Weitere Hinweise
+Der Bestellungsprozess funktioniert wie folgt:
 
-- **Frontend-Build**: Kein Build-Prozess nötig; alle Dateien werden direkt serviert
-- **Datenbank-Init**: Die Tabellen werden beim ersten Server-Start angelegt, wenn sie nicht existieren
-- **Dateistruktur**: Backend und Frontend sind voneinander unabhängig; der Server dient nur statische Dateien
-- **Error-Handling**: Fehler werden geloggt und als JSON-Response gesendet
+1. **Konfigurator**: Kunde wählt Komponenten (Größe, Teig, Soße, Käse, Beläge)
+2. **LocalStorage**: Pizza wird mit **allen Komponenten-IDs** in den Warenkorb gelegt
+3. **Checkout**: Kundendaten werden erfasst
+4. **Backend**: `POST /api/bestellung` empfängt Kundendaten & Items mit Komponenten-IDs
+5. **Datenbank**: Backend speichert Bestellung mit auto-generierter Bestellnummer (`YYYYMMDD-HHmmss-XXXX`)
+
+### Zeitzone-Konfiguration
+
+Die Zeitzone wird zentral in [Backend/server.js](Backend/server.js) definiert:
+
+```javascript
+const TIMEZONE = 'Europe/Berlin'; // CET/CEST
+app.locals.timezone = TIMEZONE;
+```
+
+Diese wird verwendet für:
+- **Bestellnummern-Generierung** (Format: `20251208-183045-7842`)
+- **Timestamps** in der Datenbank
+- **Lieferzeitpunkt-Formatierung**
+
+Alle Zeitberechnungen nutzen `luxon.DateTime` mit der konfigurierten Zeitzone.
+
+### Weitere technische Details
+
+- **Frontend-Build**: Kein Build-Prozess nötig; alle Dateien werden direkt vom Server serviert
+- **Datenbank-Init**: Die Tabellen werden beim ersten Server-Start automatisch angelegt
+- **Error-Handling**: Fehler werden geloggt und als JSON-Response zurückgegeben
+- **Warenkorb-Persistenz**: LocalStorage ermöglicht Warenkorb über Browser-Sessions hinweg
 
 ---
 
 ## Lizenz
 
 ISC (mit Third-Party-Lizensen: Robert Kuti/webanw2backend auch ISC)
-
