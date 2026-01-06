@@ -203,6 +203,51 @@ function initContactForm() {
  * 2. DB-Daten zu Tages- & Saisonpizza
  ****************************************************/
 const API_BASE = 'http://localhost:8000';
+const PENDING_PRESET_KEY = 'pendingPreset';
+
+function normalizeIdList(list) {
+    return (list || []).map(x => String(x.id ?? x)).sort();
+}
+
+function componentsEqual(a, b) {
+    if (!a || !b) return false;
+    const same = (x, y) => String(x || '') === String(y || '');
+    if (!same(a.sizeId, b.sizeId)) return false;
+    if (!same(a.doughId, b.doughId)) return false;
+    if (!same(a.sauceId, b.sauceId)) return false;
+    if (!same(a.note || '', b.note || '')) return false;
+
+    const cheeseA = normalizeIdList(a.cheeses);
+    const cheeseB = normalizeIdList(b.cheeses);
+    const toppingA = normalizeIdList(a.toppings);
+    const toppingB = normalizeIdList(b.toppings);
+
+    return cheeseA.join('|') === cheeseB.join('|') && toppingA.join('|') === toppingB.join('|');
+}
+
+function persistPendingPreset(preset) {
+    if (!preset) return;
+    try {
+        localStorage.setItem(PENDING_PRESET_KEY, JSON.stringify(preset));
+    } catch (err) {
+        console.error('Preset konnte nicht gespeichert werden:', err);
+    }
+}
+
+function readPendingPreset() {
+    const raw = localStorage.getItem(PENDING_PRESET_KEY);
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (err) {
+        console.error('Preset konnte nicht gelesen werden:', err);
+        return null;
+    }
+}
+
+function clearPendingPreset() {
+    localStorage.removeItem(PENDING_PRESET_KEY);
+}
 
 /****************************************************
  * 2a. Konfigurator: Komponenten laden & anzeigen
@@ -399,6 +444,131 @@ async function initConfiguratorPage() {
     const addBtn = document.getElementById('add-to-cart');
     if (!addBtn) return; // wir sind nicht auf configurator.html
 
+    function addCurrentSelectionToCart(options = {}) {
+        const qtyInput = document.getElementById('qty');
+        const qty = Math.max(1, parseInt((options.qtyOverride ?? qtyInput?.value) || '1', 10));
+        if (qtyInput) qtyInput.value = qty;
+
+        const perPizza = calculateConfiguratorNet();
+        const total = perPizza * qty;
+        const summary = buildConfiguratorSummary();
+        const baseLabel = (options.labelOverride || '').trim();
+        const textLabel = baseLabel && summary
+            ? `${baseLabel} – ${summary}`
+            : (baseLabel || summary || 'Individuelle Pizza');
+
+        const sizeEl = document.getElementById('size');
+        const doughEl = document.getElementById('dough');
+        const sauceEl = document.getElementById('sauce');
+        const hasSelection = sizeEl?.value && doughEl?.value && sauceEl?.value;
+
+        if (!hasSelection) {
+            if (options.showAlert !== false) {
+                alert('Bitte wähle zunächst deine Komponenten.');
+            }
+            return false;
+        }
+
+        const cheeses = Array.from(document.querySelectorAll('.cheese:checked')).map(ch => ({
+            id: ch.value,
+            bezeichnung: ch.parentElement.textContent.trim()
+        }));
+
+        const toppings = Array.from(document.querySelectorAll('.topping:checked')).map(top => ({
+            id: top.value,
+            bezeichnung: top.parentElement.textContent.trim()
+        }));
+
+        const note = document.getElementById('note')?.value.trim() || '';
+
+        const newItem = {
+            text: textLabel,
+            qty,
+            total,
+            components: {
+                sizeId: sizeEl.value,
+                doughId: doughEl.value,
+                sauceId: sauceEl.value,
+                cheeses,
+                toppings,
+                note
+            }
+        };
+
+        const existing = CART.find(item => componentsEqual(item.components, newItem.components));
+        if (existing) {
+            existing.qty += qty;
+            existing.total += perPizza * qty;
+        } else {
+            CART.push(newItem);
+        }
+        saveCart();
+        renderMiniCart();
+        return true;
+    }
+
+    function setCheckedValues(selector, values) {
+        const set = new Set((values || []).map(v => String(v)));
+        document.querySelectorAll(selector).forEach(cb => {
+            cb.checked = set.has(String(cb.value));
+        });
+    }
+
+    function applyConfiguratorSelectionsFromConfig(config) {
+        if (!config) return false;
+
+        const setSelectValue = (id, value) => {
+            if (value === undefined || value === null) return;
+            const el = document.getElementById(id);
+            if (!el) return;
+            const exists = Array.from(el.options).some(opt => String(opt.value) === String(value));
+            if (exists) {
+                el.value = String(value);
+            }
+        };
+
+        setSelectValue('size', config.groesse);
+        setSelectValue('dough', config.teig);
+        setSelectValue('sauce', config.sosse);
+
+        const cheeseValues = Array.isArray(config.kaese)
+            ? config.kaese
+            : (config.kaese || config.kaese === 0 ? [config.kaese] : []);
+        const toppingValues = Array.isArray(config.belaege) ? config.belaege : [];
+
+        setCheckedValues('.cheese', cheeseValues);
+        setCheckedValues('.topping', toppingValues);
+
+        updateConfiguratorPrice();
+        return true;
+    }
+
+    function applyPendingPresetOnConfigurator() {
+        const pending = readPendingPreset();
+        if (!pending || !pending.config) return;
+
+        const qtyInput = document.getElementById('qty');
+        if (pending.qty && qtyInput) qtyInput.value = pending.qty;
+
+        const applied = applyConfiguratorSelectionsFromConfig(pending.config);
+        if (!applied) {
+            clearPendingPreset();
+            return;
+        }
+
+        updateConfiguratorPrice();
+        const label = pending.title || 'Empfehlung';
+        const added = addCurrentSelectionToCart({
+            labelOverride: label,
+            qtyOverride: pending.qty || 1,
+            showAlert: false
+        });
+
+        if (added) {
+            clearPendingPreset();
+        }
+    }
+
     const priceEl = document.getElementById('price');
 
     try {
@@ -422,55 +592,11 @@ async function initConfiguratorPage() {
         document.getElementById('topping-groups')?.addEventListener('change', updateConfiguratorPrice);
 
         addBtn.addEventListener('click', () => {
-            const qty = Math.max(1, parseInt(document.getElementById('qty')?.value || '1', 10));
-            const perPizza = calculateConfiguratorNet();
-            const total = perPizza * qty;
-            const summary = buildConfiguratorSummary();
-
-            const sizeEl = document.getElementById('size');
-            const doughEl = document.getElementById('dough');
-            const sauceEl = document.getElementById('sauce');
-
-            const hasSelection = sizeEl?.value && doughEl?.value && sauceEl?.value;
-            if (!hasSelection) {
-                alert('Bitte wähle zunächst deine Komponenten.');
-                return;
-            }
-
-            // Sammle alle ausgewählten Käsesorten
-            const cheeses = Array.from(document.querySelectorAll('.cheese:checked')).map(ch => ({
-                id: ch.value,
-                bezeichnung: ch.parentElement.textContent.trim()
-            }));
-
-            // Sammle alle ausgewählten Beläge
-            const toppings = Array.from(document.querySelectorAll('.topping:checked')).map(top => ({
-                id: top.value,
-                bezeichnung: top.parentElement.textContent.trim()
-            }));
-
-            const note = document.getElementById('note')?.value.trim() || '';
-
-            // Speichere mit allen Komponenten-Informationen
-            CART.push({
-                text: summary || 'Individuelle Pizza',
-                qty,
-                total,
-                components: {
-                    sizeId: sizeEl.value,
-                    doughId: doughEl.value,
-                    sauceId: sauceEl.value,
-                    cheeses,
-                    toppings,
-                    note
-                }
-            });
-            saveCart();
-            renderMiniCart();
-            // Auf der Konfiguratorseite bleiben; Mini-Warenkorb aktualisieren
+            addCurrentSelectionToCart();
         });
 
         updateConfiguratorPrice();
+        applyPendingPresetOnConfigurator();
     } catch (err) {
         console.error('Konfigurator konnte nicht initialisiert werden:', err);
         if (priceEl) priceEl.textContent = 'Fehler';
@@ -536,10 +662,19 @@ function renderDailyPizzaOnIndex() {
         }
 
         el.innerHTML = `
-            <strong>${p.bezeichnung}</strong><br>
+            <a href="#" id="daily-link" class="recommendation-link" aria-label="Pizza des Tages im Konfigurator öffnen">${p.bezeichnung}</a><br>
             ${p.beschreibung}<br>
             Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
         `;
+
+        const config = parseRecommendationConfig(p.konfiguration_json);
+        bindRecommendationCard('daily-link', {
+            title: p.bezeichnung,
+            description: p.beschreibung,
+            netPrice: p.netto_preis,
+            config,
+            source: 'daily'
+        });
     }
     load();
 }
@@ -556,12 +691,58 @@ function renderSeasonPizzaOnIndex() {
         }
 
         el.innerHTML = `
-            <strong>${p.bezeichnung}</strong><br>
+            <a href="#" id="season-link" class="recommendation-link" aria-label="Saisonpizza im Konfigurator öffnen">${p.bezeichnung}</a><br>
             ${p.beschreibung}<br>
             Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
         `;
+
+        const config = parseRecommendationConfig(p.konfiguration_json);
+        bindRecommendationCard('season-link', {
+            title: p.bezeichnung,
+            description: p.beschreibung,
+            netPrice: p.netto_preis,
+            config,
+            source: 'seasonal'
+        });
     }
     load();
+}
+
+function parseRecommendationConfig(raw) {
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (err) {
+        console.error('Empfehlungskonfiguration konnte nicht geparst werden:', err);
+        return null;
+    }
+}
+
+function bindRecommendationCard(cardId, preset) {
+    if (!preset || !preset.config) return;
+    const card = document.getElementById(cardId);
+    if (!card) return;
+
+    const navigate = (evt) => {
+        if (evt) evt.preventDefault();
+        persistPendingPreset({
+            title: preset.title,
+            description: preset.description,
+            netPrice: preset.netPrice,
+            config: preset.config,
+            source: preset.source,
+            qty: 1
+        });
+        window.location.href = 'configurator.html';
+    };
+
+    card.addEventListener('click', navigate);
+    card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            navigate();
+        }
+    });
 }
 
 /****************************************************
