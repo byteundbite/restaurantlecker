@@ -8,29 +8,29 @@
 
 -- Größen
 INSERT INTO Groesse (id, bezeichnung, preis, beschreibung) VALUES
-(1, 'klein', 0.00, 'Klein, 26cm'),
-(2, 'mittel', 3.00, 'Mittel, 30cm'),
-(3, 'groß', 6.00, 'Groß, 34cm');
+(1, 'klein', 3.50, 'Klein, 26cm'),
+(2, 'mittel', 4.50, 'Mittel, 30cm'),
+(3, 'groß', 5.50, 'Groß, 34cm');
 
 -- Teigarten
 INSERT INTO Teig (id, bezeichnung, preis, beschreibung) VALUES
-(1, 'italienisch', 0.00, 'Italienisch - dünn & knusprig'),
+(1, 'italienisch', 0.50, 'Italienisch - dünn & knusprig'),
 (2, 'amerikanisch', 1.50, 'Amerikanisch - dick & fluffig'),
 (3, 'glutenfrei', 2.50, 'Glutenfrei'),
 (4, 'kaeserand', 2.00, 'Gefüllt mit Mozzarella');
 
 -- Soßen
 INSERT INTO Sosse (id, bezeichnung, preis, beschreibung) VALUES
-(1, 'rot', 0.00, 'Klassische Tomatensauce'),
-(2, 'weiss', 1.00, 'Cremige weiße Sauce'),
+(1, 'rot', 1.00, 'Klassische Tomatensauce'),
+(2, 'weiss', 1.20, 'Cremige weiße Sauce'),
 (3, 'bbq', 1.50, 'Würzig-rauchig'),
 (4, 'pesto', 2.00, 'Frisches Basilikum-Pesto'),
 (5, 'oel', 1.00, 'Mit mediterranen Kräutern');
 
 -- Käsesorten
 INSERT INTO Kaese (id, bezeichnung, preis, beschreibung) VALUES
-(1, 'mozzarella', 0.00, 'Klassischer italienischer Käse'),
-(2, 'gouda', 0.50, 'Milder holländischer Käse'),
+(1, 'mozzarella', 1.50, 'Klassischer italienischer Käse'),
+(2, 'gouda', 0.80, 'Milder holländischer Käse'),
 (3, 'gorgonzola', 2.00, 'Kräftiger Blauschimmelkäse'),
 (4, 'parmesan', 1.50, 'Gereifter Hartkäse'),
 (5, 'feta', 1.50, 'Griechischer Schafskäse'),
@@ -39,13 +39,13 @@ INSERT INTO Kaese (id, bezeichnung, preis, beschreibung) VALUES
 -- Beläge
 INSERT INTO Belag (id, bezeichnung, preis, kategorie, beschreibung) VALUES
 -- Fleisch
-(1, 'salami', 1.50, 'fleisch', 'Italienische Salami'),
-(2, 'schinken', 1.50, 'fleisch', 'Gekochter Schinken'),
-(3, 'thunfisch', 2.00, 'fleisch', 'In Olivenöl'),
-(4, 'haehnchen', 2.50, 'fleisch', 'Gegrilltes Hähnchenfleisch'),
+(1, 'salami', 1.90, 'fleisch', 'Italienische Salami'),
+(2, 'schinken', 1.80, 'fleisch', 'Gekochter Schinken'),
+(3, 'thunfisch', 2.20, 'fleisch', 'In Olivenöl'),
+(4, 'haehnchen', 2.20, 'fleisch', 'Gegrilltes Hähnchenfleisch'),
 (5, 'hackfleisch', 2.00, 'fleisch', 'Gewürztes Rinderhack'),
-(6, 'speck', 1.80, 'fleisch', 'Knuspriger Bacon'),
-(7, 'peperoni', 1.50, 'fleisch', 'Scharfe Salamiwurst'),
+(6, 'speck', 2.00, 'fleisch', 'Knuspriger Bacon'),
+(7, 'peperoni', 1.90, 'fleisch', 'Scharfe Salamiwurst'),
 
 -- Gemüse
 (8, 'champignons', 1.00, 'gemuese', 'Frische Pilze'),
@@ -54,19 +54,19 @@ INSERT INTO Belag (id, bezeichnung, preis, kategorie, beschreibung) VALUES
 (11, 'oliven', 1.20, 'gemuese', 'Schwarze Oliven'),
 (12, 'mais', 0.80, 'gemuese', 'Süßer Zuckermais'),
 (13, 'tomaten', 1.00, 'gemuese', 'Frische Kirschtomaten'),
-(14, 'spinat', 1.50, 'gemuese', 'Frischer Blattspinat'),
-(15, 'rucola', 1.50, 'gemuese', 'Würziger Rauke-Salat'),
-(16, 'artischocken', 1.80, 'gemuese', 'Marinierte Artischockenherzen'),
+(14, 'spinat', 1.30, 'gemuese', 'Frischer Blattspinat'),
+(15, 'rucola', 1.30, 'gemuese', 'Würziger Rauke-Salat'),
+(16, 'artischocken', 1.50, 'gemuese', 'Marinierte Artischockenherzen'),
 (17, 'jalapenos', 1.20, 'gemuese', 'Scharfe grüne Chilis'),
 (18, 'ananas', 1.00, 'gemuese', 'Süße Ananasscheiben'),
-(19, 'brokkoli', 1.50, 'gemuese', 'Frischer grüner Brokkoli'),
-(20, 'zucchini', 1.30, 'gemuese', 'Gegrillte Zucchinischeiben');
+(19, 'brokkoli', 1.30, 'gemuese', 'Frischer grüner Brokkoli'),
+(20, 'zucchini', 1.20, 'gemuese', 'Gegrillte Zucchinischeiben');
 
--- Spezialitäten
+-- Sonstiges
 INSERT INTO Belag (id, bezeichnung, preis, kategorie, beschreibung) VALUES
 (21, 'ei', 1.00, 'sonstiges', 'Frisches Spiegelei'),
 (22, 'kapern', 1.20, 'sonstiges', 'Mediterrane Kapern'),
-(23, 'sardellen', 1.50, 'sonstiges', 'Eingelegte Anchovis'),
+(23, 'sardellen', 1.80, 'sonstiges', 'Eingelegte Anchovis'),
 (24, 'frische kräuter', 0.80, 'sonstiges', 'Basilikum, Oregano'),
 (25, 'knoblauch', 0.50, 'sonstiges', 'Frischer Knoblauch');
 
