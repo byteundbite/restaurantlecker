@@ -66,12 +66,14 @@
 
           <div class="form-group">
             <label for="co-phone">Telefon</label>
-            <input id="co-phone" type="tel" placeholder="+49 ..." pattern="[0-9+\-\s]+" />
+            <input id="co-phone" type="text" placeholder="+49 ..." />
+            <div class="phone-feedback" id="co-phone-feedback"></div>
           </div>
 
           <div class="form-group">
             <label for="co-email">E-Mail</label>
-            <input id="co-email" type="email" required />
+            <input id="co-email" type="text" required />
+            <div class="email-feedback" id="co-email-feedback"></div>
           </div>
 
           <!-- Liefertermin: ENTWEDER / ODER -->
