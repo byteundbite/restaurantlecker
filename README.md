@@ -118,8 +118,8 @@ Enthält Utility-Funktionen für:
 |-----|-----------|---------------|
 | `KonfiguratorDao` | Groesse, Teig, Sosse, Belag, Kaese, Konfiguration | `loadAllGroessen()`, `loadAllTeig()`, `loadAllSosse()`, `loadAllBelag()`, `loadAllKaese()`, `createKonfiguration()` |
 | `BestellungDao` | Bestellung, Bestellposition, Konfiguration | `createOrder()`, `getOrderById()`, `getOrdersByCustomerEmail()`, `generateBestellnummer()` |
-| `TagespizzaDao` | TagespizzaDef | `loadAll()`, `loadById()`, `create()`, `update()`, `delete()` |
-| `SaisonpizzaDao` | SaisonpizzaDef | `loadAll()`, `loadById()`, `create()`, `update()`, `delete()` |
+| `TagespizzaDao` | TagesPizza, Konfiguration | `loadAll()`, `loadById()`, `loadByTag()` |
+| `SaisonpizzaDao` | SaisonPizza, Konfiguration | `loadAll()`, `loadById()`, `loadBySaison()` |
 | `KontaktDao` | Kontakt | `loadAll()`, `create()` |
 
 ### Services (API-Endpoints)
@@ -203,18 +203,16 @@ POST /api/kontakt                    → Neue Kontaktanfrage (Anfrage-Validierun
 
 ```
 GET  /api/tagespizza/alle            → Alle Tagespizzas
-GET  /api/tagespizza/:id             → Tagespizza nach ID
-POST /api/tagespizza                 → Neue Tagespizza (Admin)
-PUT  /api/tagespizza/:id             → Tagespizza aktualisieren (Admin)
+GET  /api/tagespizza/gib/:id         → Tagespizza nach ID
+GET  /api/tagespizza/tag/:tag        → Tagespizza nach Wochentag (z.B. Montag)
 ```
 
 #### `saisonpizza.js`
 
 ```
 GET  /api/saisonpizza/alle           → Alle Saisonpizzas
-GET  /api/saisonpizza/:id            → Saisonpizza nach ID
-POST /api/saisonpizza                → Neue Saisonpizza (Admin)
-PUT  /api/saisonpizza/:id            → Saisonpizza aktualisieren (Admin)
+GET  /api/saisonpizza/gib/:id        → Saisonpizza nach ID
+GET  /api/saisonpizza/saison/:saison → Saisonpizza nach Saison (Winter, Frühling, Sommer, Herbst)
 ```
 
 ---
@@ -225,7 +223,7 @@ PUT  /api/saisonpizza/:id            → Saisonpizza aktualisieren (Admin)
 
 | Seite | Datei | Backend-Verbindung | Funktion |
 |-------|-------|-------------------|----------|
-| Startseite | `index.html` | `GET /api/konfigurator/komponenten`<br>`GET /api/tagespizza`<br>`GET /api/saisonpizza` | Zeigt Pizza des Tages & Saisonpizza |
+| Startseite | `index.html` | `GET /api/tagespizza/tag/:tag`<br>`GET /api/saisonpizza/saison/:saison` | Zeigt Pizza des Tages & Saisonpizza |
 | Konfigurator | `configurator.html` | `GET /api/konfigurator/komponenten` | UI für Pizza-Konfiguration mit Live-Preisberechnung;<br>Speichert Komponenten-IDs im LocalStorage |
 | Kontakt | `contact.html` | `POST /api/kontakt` | Kontaktformular mit Echtzeit-Validierung (E-Mail, Telefon) |
 | Warenkorb | `cart.html` | — | Warenkorb-Übersicht aus LocalStorage;<br>Mengen anpassen, Positionen entfernen |
@@ -306,7 +304,7 @@ Fehlerhafte Anfragen:
 
 ## Datenbankschema
 
-Die SQLite Datenbank wird automatisch beim Start angelegt. Haupttabellen:
+Die SQLite Datenbank `byteundbite.sqlite` muss vor dem ersten Start existieren. Schema und Beispieldaten können mit den SQL-Dateien initialisiert werden. Haupttabellen:
 
 ### Konfigurationskomponenten
 
@@ -333,14 +331,32 @@ CREATE TABLE Konfiguration (
 ### Pizza-Vorlagen
 
 ```sql
-CREATE TABLE TagespizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
-CREATE TABLE SaisonpizzaDef (id INTEGER PRIMARY KEY, bezeichnung TEXT, beschreibung TEXT, preis REAL);
+CREATE TABLE TagesPizza (
+  id INTEGER PRIMARY KEY,
+  tag TEXT NOT NULL,
+  konfiguration_id INTEGER NOT NULL,
+  FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
+);
+
+CREATE TABLE SaisonPizza (
+  id INTEGER PRIMARY KEY,
+  saison TEXT NOT NULL,
+  konfiguration_id INTEGER NOT NULL,
+  FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
+);
 ```
 
 ### Kontakte & Bestellungen
 
 ```sql
-CREATE TABLE Kontakt (id INTEGER PRIMARY KEY, name TEXT, phone TEXT, email TEXT, message TEXT, erstellt DATETIME);
+CREATE TABLE Kontakt (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  telefon TEXT,
+  email TEXT NOT NULL,
+  nachricht TEXT NOT NULL,
+  erstellt_am TEXT
+);
 
 CREATE TABLE Bestellung (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -368,7 +384,10 @@ CREATE TABLE Bestellposition (
   config_json TEXT,
   netto_einzelpreis REAL NOT NULL,
   menge INTEGER NOT NULL,
-  netto_gesamtpreis REAL NOT NULL
+  netto_gesamtpreis REAL NOT NULL,
+  notizen TEXT,
+  FOREIGN KEY (bestellung_id) REFERENCES Bestellung(id),
+  FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
 );
 ```
 
@@ -444,7 +463,7 @@ Alle Zeitberechnungen nutzen `luxon.DateTime` mit der konfigurierten Zeitzone.
 ### Weitere technische Details
 
 - **Frontend-Build**: Kein Build-Prozess nötig; alle Dateien werden direkt vom Server serviert
-- **Datenbank-Init**: Die Tabellen werden beim ersten Server-Start automatisch angelegt
+- **Datenbank-Init**: Die Datenbank muss manuell mit den SQL-Dateien initialisiert werden (siehe `Backend/db/`)
 - **Error-Handling**: Fehler werden geloggt und als JSON-Response zurückgegeben
 - **Warenkorb-Persistenz**: LocalStorage ermöglicht Warenkorb über Browser-Sessions hinweg
 

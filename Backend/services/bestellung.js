@@ -22,6 +22,7 @@ console.log('- Service Bestellung');
  *   "total": 32.13
  * }
  */
+
 serviceRouter.post('/bestellung', function(request, response) {
     console.log('Service Bestellung: Client requested to create order');
 
