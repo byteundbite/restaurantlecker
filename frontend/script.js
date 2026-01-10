@@ -724,7 +724,7 @@ function renderDailyPizzaOnIndex() {
         el.innerHTML = `
             <a href="#" id="daily-link" class="recommendation-link" aria-label="Pizza des Tages im Konfigurator öffnen">${p.bezeichnung}</a><br>
             ${p.beschreibung}<br>
-            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
+            Preis: <strong>${euro(p.netto_preis)}</strong> zzgl. MwSt.
         `;
 
         const config = parseRecommendationConfig(p.konfiguration_json);
@@ -753,7 +753,7 @@ function renderSeasonPizzaOnIndex() {
         el.innerHTML = `
             <a href="#" id="season-link" class="recommendation-link" aria-label="Saisonpizza im Konfigurator öffnen">${p.bezeichnung}</a><br>
             ${p.beschreibung}<br>
-            Preis: <strong>${euro(p.netto_preis * 1.19)}</strong>
+            Preis: <strong>${euro(p.netto_preis)}</strong> zzgl. MwSt.
         `;
 
         const config = parseRecommendationConfig(p.konfiguration_json);
@@ -850,12 +850,13 @@ async function addRecommendationToCart(preset) {
         bezeichnung: `Belag ${id}`
     }));
 
-    const grossTotal = preset.netPrice * 1.19;
+    // Netto-Preis aus der DB verwenden; MwSt. wird erst im Checkout addiert
+    const netTotal = preset.netPrice;
 
     const newItem = {
         text: textLabel,
         qty: 1,
-        total: grossTotal,
+        total: netTotal,
         components: {
             sizeId: config.groesse,
             doughId: config.teig,
@@ -869,7 +870,7 @@ async function addRecommendationToCart(preset) {
     const existing = CART.find(item => componentsEqual(item.components, newItem.components));
     if (existing) {
         existing.qty += 1;
-        existing.total += grossTotal;
+        existing.total += netTotal;
     } else {
         CART.push(newItem);
     }
