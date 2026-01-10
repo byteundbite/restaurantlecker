@@ -1,41 +1,9 @@
-	-- =========================================================================
-	-- Datenbankmodell für Restaurant Lecker 
-	-- Create Table Statements
-    -- Version: 2.0
-	-- =========================================================================
+-- =========================================================================
+-- Datenbankmodell für Restaurant Lecker 
+-- Create Table Statements - Datenbankschema
+-- =========================================================================
 
-	PRAGMA foreign_keys = ON;
-
-	-- ========== 1) KONFIGURATOR-BAUSTEINE ==========
-	CREATE TABLE IF NOT EXISTS Groesse (
-		id INTEGER PRIMARY KEY,
-		bezeichnung TEXT NOT NULL,
-		preis REAL NOT NULL DEFAULT 0.0,
-		beschreibung TEXT
-	);
-
-	CREATE TABLE IF NOT EXISTS Teig (
-		id INTEGER PRIMARY KEY,
-		bezeichnung TEXT NOT NULL,
-		preis REAL NOT NULL DEFAULT 0.0,
-		beschreibung TEXT
-	);
-
-	CREATE TABLE IF NOT EXISTS Sosse (
-		id INTEGER PRIMARY KEY,
-		bezeichnung TEXT NOT NULL,
-		preis REAL NOT NULL DEFAULT 0.0,
-		beschreibung TEXT
-	);
-
-	CREATE TABLE IF NOT EXISTS Kaese (
-		id INTEGER PRIMARY KEY,
-		bezeichnung TEXT NOT NULL,
-		preis REAL NOT NULL DEFAULT 0.0,
-		beschreibung TEXT
-	);
-
-	CREATE TABLE IF NOT EXISTS Belag (
+CREATE TABLE Belag (
 		id INTEGER PRIMARY KEY,
 		bezeichnung TEXT NOT NULL,
 		preis REAL NOT NULL DEFAULT 0.0,
@@ -44,39 +12,7 @@
 	);
 
 
-	-- ========== 2) KONFIGURATIONEN ==========
-	-- Konfigurationen speichern
-	CREATE TABLE IF NOT EXISTS Konfiguration (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		konfiguration_json TEXT NOT NULL,
-		bezeichnung TEXT NOT NULL,
-		beschreibung TEXT,
-		netto_preis REAL NOT NULL
-	);
-
-	-- tägliche Pizzen
-	CREATE TABLE IF NOT EXISTS TagesPizza (
-		id INTEGER PRIMARY KEY,
-		tag TEXT NOT NULL,
-		konfiguration_id INTEGER NOT NULL,
-
-
-		FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
-	);
-
-	-- Saisonpizzen
-	CREATE TABLE IF NOT EXISTS SaisonPizza (
-		id INTEGER PRIMARY KEY,
-		saison TEXT NOT NULL,
-		konfiguration_id INTEGER NOT NULL,
-
-
-		FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
-	);
-
-
-	-- ========== 3) BESTELLUNGEN UND POSITIONEN ==========
-	CREATE TABLE IF NOT EXISTS Bestellung (
+CREATE TABLE Bestellung (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		erstellt_am TEXT,
 		bestellnummer TEXT UNIQUE,
@@ -96,7 +32,59 @@
 		brutto_betrag REAL NOT NULL
 	);
 
-	CREATE TABLE IF NOT EXISTS Bestellposition (
+
+CREATE TABLE Groesse (
+		id INTEGER PRIMARY KEY,
+		bezeichnung TEXT NOT NULL,
+		preis REAL NOT NULL DEFAULT 0.0,
+		beschreibung TEXT
+	);
+
+
+CREATE TABLE Kaese (
+		id INTEGER PRIMARY KEY,
+		bezeichnung TEXT NOT NULL,
+		preis REAL NOT NULL DEFAULT 0.0,
+		beschreibung TEXT
+	);
+
+
+CREATE TABLE Konfiguration (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		konfiguration_json TEXT NOT NULL,
+		bezeichnung TEXT NOT NULL,
+		beschreibung TEXT,
+		netto_preis REAL NOT NULL
+	);
+
+
+CREATE TABLE Kontakt (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		telefon TEXT,
+		email TEXT NOT NULL,
+		nachricht TEXT NOT NULL,
+		erstellt_am TEXT
+	);
+
+
+CREATE TABLE Sosse (
+		id INTEGER PRIMARY KEY,
+		bezeichnung TEXT NOT NULL,
+		preis REAL NOT NULL DEFAULT 0.0,
+		beschreibung TEXT
+	);
+
+
+CREATE TABLE Teig (
+		id INTEGER PRIMARY KEY,
+		bezeichnung TEXT NOT NULL,
+		preis REAL NOT NULL DEFAULT 0.0,
+		beschreibung TEXT
+	);
+
+
+CREATE TABLE Bestellposition (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		bestellung_id INTEGER NOT NULL,
 		positionsnummer INTEGER NOT NULL,
@@ -112,19 +100,24 @@
 		FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
 	);
 
-	
-	-- ========== 4) KONTAKTANFRAGEN ==========
-	CREATE TABLE IF NOT EXISTS Kontakt (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		telefon TEXT,
-		email TEXT NOT NULL,
-		nachricht TEXT NOT NULL,
-		erstellt_am TEXT
+
+CREATE TABLE SaisonPizza (
+		id INTEGER PRIMARY KEY,
+		saison TEXT NOT NULL,
+		konfiguration_id INTEGER NOT NULL,
+
+		FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
 	);
 
 
-	-- =========================================================================
-	-- Ende des Schemas
-	-- =========================================================================
-	
+CREATE TABLE TagesPizza (
+		id INTEGER PRIMARY KEY,
+		tag TEXT NOT NULL,
+		konfiguration_id INTEGER NOT NULL,
+
+		FOREIGN KEY (konfiguration_id) REFERENCES Konfiguration(id)
+	);
+
+-- =========================================================================
+-- Ende des Schemas
+-- =========================================================================
