@@ -933,13 +933,46 @@ function renderMiniCart() {
     list.innerHTML = "";
     let sum = 0;
 
-    CART.forEach(item => {
+    CART.forEach((item, index) => {
         const li = document.createElement("li");
         li.className = "mini-cart-item";
         li.innerHTML = `
-            <span>${item.qty}× ${item.text}</span>
-            <strong>${euro(item.total)}</strong>
+            <div class="mini-cart-item-info">
+                <span>${item.qty}× ${item.text}</span>
+                <strong>${euro(item.total)}</strong>
+            </div>
+            <div class="mini-cart-item-actions">
+                <button class="btn-icon" data-action="decrease" data-index="${index}" title="Menge verringern" aria-label="Menge verringern">−</button>
+                <button class="btn-icon" data-action="increase" data-index="${index}" title="Menge erhöhen" aria-label="Menge erhöhen">+</button>
+                <button class="btn-icon btn-icon-danger" data-action="remove" data-index="${index}" title="Entfernen" aria-label="Entfernen">×</button>
+            </div>
         `;
+        
+        // Event-Handler für die Buttons
+        li.querySelector('[data-action="decrease"]').addEventListener('click', () => {
+            if (item.qty > 1) {
+                const unitPrice = item.total / item.qty;
+                item.qty--;
+                item.total = unitPrice * item.qty;
+                saveCart();
+                renderMiniCart();
+            }
+        });
+        
+        li.querySelector('[data-action="increase"]').addEventListener('click', () => {
+            const unitPrice = item.total / item.qty;
+            item.qty++;
+            item.total = unitPrice * item.qty;
+            saveCart();
+            renderMiniCart();
+        });
+        
+        li.querySelector('[data-action="remove"]').addEventListener('click', () => {
+            CART.splice(index, 1);
+            saveCart();
+            renderMiniCart();
+        });
+        
         list.appendChild(li);
         sum += item.total;
     });

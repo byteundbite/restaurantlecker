@@ -158,10 +158,55 @@ html, body{
 .mini-cart-list{ list-style:none; padding:0; margin:0 0 var(--space-2); }
 .mini-cart-list li{
     display:flex;
-    justify-content:space-between;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
     gap: .8rem;
     border-bottom:1px solid #eee;
-    padding:.4rem 0;
+    padding:.6rem 0;
+}
+.mini-cart-item-info{
+    display:flex;
+    justify-content:space-between;
+    gap: .8rem;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+}
+.mini-cart-item-info span{
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.mini-cart-item-actions{
+    display:flex;
+    gap: .4rem;
+    flex-shrink: 0;
+}
+.btn-icon{
+    background: var(--color-brand);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.btn-icon:hover{
+    background: var(--color-brand-dark);
+}
+.btn-icon-danger{
+    background: #dc3545;
+}
+.btn-icon-danger:hover{
+    background: #c82333;
 }
 .mini-cart-summary{
     display:flex;
@@ -287,8 +332,8 @@ textarea{ resize: vertical; }
 .site-footer p{ margin:0; text-align:center; }
 
 /* ========== 13) Seiten-spezifische Layouts ========== */
-/* Konfigurator: rechte Spalte etwas schmaler */
-.grid-2.configurator{ grid-template-columns: 2.4fr 1.2fr; }
+/* Konfigurator: linke Spalte breiter für Konfigurationsoptionen */
+.grid-2.configurator{ grid-template-columns: 2.5fr 1.5fr; }
 @media (max-width: 900px){
     .grid-2.configurator{ grid-template-columns: 1fr; }
 }
