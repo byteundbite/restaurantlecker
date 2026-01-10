@@ -109,7 +109,7 @@ INSERT INTO Teig (id,bezeichnung,preis,beschreibung) VALUES
 	 (1,'italienisch',0.5,'Italienisch - dünn & knusprig'),
 	 (2,'amerikanisch',1.5,'Amerikanisch - dick & fluffig'),
 	 (3,'glutenfrei',2.5,'Glutenfrei'),
-	 (4,'kaeserand',2.0,'Gefüllt mit Mozzarella');
+	 (4,'käserand',2.0,'Gefüllt mit Mozzarella');
 
 -- =========================================================================
 -- Ende der Insert Statements
