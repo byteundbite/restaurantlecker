@@ -1,10 +1,9 @@
 # Restaurant Lecker – Pizzakonfigurator
 
-Eine Full-Stack-Webanwendung für die Konfiguration und Bestellung von Pizzas mit lokalem Warenkorb (LocalStorage) und vollständiger Backend-Bestellabwicklung inkl. Datenbankpersistierung.
+Eine Full-Stack-Webanwendung für die Konfiguration und Bestellung von Pizzen mit lokalem Warenkorb (LocalStorage) und vollständiger Backend-Bestellabwicklung inkl. Datenbankpersistierung.
 
-**Entwickelt von:** Maximilian Svabensky, Thomas Scharkowski, Jan Umblia  
+**Entwickelt von:** Maxmilian Svabensky, Thomas Scharkowski, Jan Umblia  
 **Stack:** Node.js (Express) Backend, vanilla HTML/CSS/JavaScript Frontend, SQLite Datenbank  
-**Version:** 4.0 – Backend Version 4.5.0
 
 ---
 
