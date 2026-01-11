@@ -4,7 +4,6 @@ Eine Full-Stack-Webanwendung für die Konfiguration und Bestellung von Pizzen mi
 
 **Entwickelt von:** Maxmilian Svabensky, Thomas Scharkowski, Jan Umblia  
 **Stack:** Node.js (Express) Backend, vanilla HTML/CSS/JavaScript Frontend, SQLite Datenbank  
-**Version:** 4.0 – Backend Version 4.5.0
 
 ---
 
